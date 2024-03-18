@@ -51,7 +51,7 @@ end
 PerformanceManager.TaskBegin = function(this, TaskName)
 	-- Initialize task data
 	this.Tasks[TaskName] = {
-		TaskStartTime = tick(),
+		TaskStartTime = os.clock(),
 		TaskEndTime = nil,
 		IsTaskRunning = true
 	}
@@ -66,7 +66,7 @@ PerformanceManager.TaskEnd = function(this, TaskName)
 	local Task = this.Tasks[TaskName]
 
 	-- Record end time and mark task as not running
-	Task.TaskEndTime = tick()
+	Task.TaskEndTime = os.clock()
 	Task.IsTaskRunning = false
 
 	-- Retrieve or initialize running time list for the task
@@ -128,13 +128,11 @@ end
 PerformanceManager.GetAllTasks = function(this)
 	-- Initialize an empty table to store the result
 	local Result = {}
-	-- Get the current time
-	local CurrentTime = tick()
 
 	-- Iterate over all tasks
 	for TaskName, Data in pairs(this.Tasks) do
 		-- Check if the task is running or has recently finished (within 60 seconds)
-		if Data.IsTaskRunning or (CurrentTime - Data.TaskEndTime) < 60 then
+		if Data.IsTaskRunning then
 			-- Add information about the task to the result table
 			Result[TaskName] = {
 				Times = this.TaskExecutionRunningTimeList[TaskName] or {}, -- Execution times
