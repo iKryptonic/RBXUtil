@@ -122,7 +122,48 @@ local testingSuite = {
 		else
 			print("[CancelTask] Task was successfully descheduled")
 		end
-	end, {}, false),
+	end, {}, false),	
+	
+	-- Test task descheduling and rescheduling
+	AddTestWithControl("DescheduleReschedule", function(TaskScheduler)
+		local taskExecuted = false
+
+		local taskId = TaskScheduler:ScheduleTask({
+			TaskName = "DescheduleRescheduleTask",
+			UseSilentOutput = true,
+			TaskExecutionDelay = 5,
+			TaskAction = function()
+				taskExecuted = true
+			end
+		})
+
+		TaskScheduler:Deschedule("DescheduleRescheduleTask")
+
+		task.wait(6)
+
+		if not taskExecuted then
+			--print("[DescheduleReschedule] Task successfully descheduled")
+		else
+			error("[DescheduleReschedule] Task execution after descheduling")
+		end
+
+		TaskScheduler:ScheduleTask({
+			TaskName = "DescheduleRescheduleTask",
+			UseSilentOutput = true,
+			TaskExecutionDelay = 0,
+			TaskAction = function()
+				taskExecuted = true
+			end
+		})
+
+		task.wait(0.2)
+
+		if taskExecuted then
+			print("[DescheduleReschedule] Task successfully rescheduled and executed")
+		else
+			error("[DescheduleReschedule] Task not executed after rescheduling")
+		end
+	end, {}, true),
 
 	-- Schedule a task to run immediately
 	AddTestWithControl("ScheduleImmediateTask", function(TaskScheduler)
@@ -132,6 +173,18 @@ local testingSuite = {
 			TaskExecutionDelay = 0,
 			TaskAction = function()
 				print("[ScheduleImmediateTask] Task ran immediately")
+			end
+		})
+	end, {}, true),
+
+	-- Schedule a task with a negative delay and verify it runs immediately
+	AddTestWithControl("ScheduleNegativeDelayTask", function(TaskScheduler)
+		TaskScheduler:ScheduleTask({
+			TaskName = "ScheduleNegativeDelayTask",
+			UseSilentOutput = true,
+			TaskExecutionDelay = -1,
+			TaskAction = function()
+				print("[ScheduleNegativeDelayTask] Task ran immediately")
 			end
 		})
 	end, {}, true),
@@ -179,6 +232,30 @@ local testingSuite = {
 					print("[ScheduleMediumDelayedTask] Task ran after the specified delay, ErrorMargin: " .. tostring(math.round(ErrorMargin * 100)) .. "%")
 				else
 					error("[ScheduleMediumDelayedTask] Task did not run after the specified delay, ErrorMargin: " .. tostring(math.round(ErrorMargin * 100)) .. "%")
+				end
+			end
+		})
+	end, {}, true),
+
+	-- Schedule a task with a long delay and verify it runs after the specified delay
+	AddTestWithControl("ScheduleLongDelayedTask", function(TaskScheduler)
+		local Delay = 10
+		local StartTime = tick()
+
+		TaskScheduler:ScheduleTask({
+			TaskName = "ScheduleLongDelayedTask",
+			UseSilentOutput = true,
+			TaskExecutionDelay = Delay,
+			TaskAction = function()
+				local EndTime = tick()
+				local TimeTaken = EndTime - StartTime
+
+				local ErrorMargin = math.abs((Delay - TimeTaken) / Delay)
+
+				if ErrorMargin < ErrorMarginUpperLimit then -- 15% error margin
+					print("[ScheduleLongDelayedTask] Task ran after the specified delay, ErrorMargin: " .. tostring(math.round(ErrorMargin * 100)) .. "%")
+				else
+					error("[ScheduleLongDelayedTask] Task did not run after the specified delay, ErrorMargin: " .. tostring(math.round(ErrorMargin * 100)) .. "%")
 				end
 			end
 		})
@@ -237,67 +314,6 @@ local testingSuite = {
 				else
 					error("[ScheduleMultipleTasks] Tasks did not run in the correct order")
 				end
-			end
-		})
-	end, {}, true),
-
-	-- Schedule a task to run every 5 seconds and verify it runs multiple times
-	AddTestWithControl("ScheduleRecurringTask", function(TaskScheduler)
-		local TaskCount = 0
-		local TaskId = TaskScheduler:ScheduleTask({
-			TaskName = "ScheduleRecurringTask",
-			UseSilentOutput = true,
-			TaskExecutionDelay = 1,
-			IsRecurringTask = true,
-			TaskAction = function()
-				TaskCount = TaskCount + 1
-
-				if TaskCount == 3 then
-					TaskScheduler:Deschedule("ScheduleRecurringTask")
-					print("[ScheduleRecurringTask] Task ran 3 times and was descheduled")
-				end
-			end
-		})
-
-		task.wait(5)
-
-		if TaskScheduler["ScheduleRecurringTask"] or TaskCount ~= 3 then
-			error("[ScheduleRecurringTask] Task was not successfully descheduled", 0)
-		end
-	end, {}, true),
-
-	-- Schedule a task with a long delay and verify it runs after the specified delay
-	AddTestWithControl("ScheduleLongDelayedTask", function(TaskScheduler)
-		local Delay = 10
-		local StartTime = tick()
-
-		TaskScheduler:ScheduleTask({
-			TaskName = "ScheduleLongDelayedTask",
-			UseSilentOutput = true,
-			TaskExecutionDelay = Delay,
-			TaskAction = function()
-				local EndTime = tick()
-				local TimeTaken = EndTime - StartTime
-
-				local ErrorMargin = math.abs((Delay - TimeTaken) / Delay)
-
-				if ErrorMargin < ErrorMarginUpperLimit then -- 15% error margin
-					print("[ScheduleLongDelayedTask] Task ran after the specified delay, ErrorMargin: " .. tostring(math.round(ErrorMargin * 100)) .. "%")
-				else
-					error("[ScheduleLongDelayedTask] Task did not run after the specified delay, ErrorMargin: " .. tostring(math.round(ErrorMargin * 100)) .. "%")
-				end
-			end
-		})
-	end, {}, true),
-
-	-- Schedule a task with a negative delay and verify it runs immediately
-	AddTestWithControl("ScheduleNegativeDelayTask", function(TaskScheduler)
-		TaskScheduler:ScheduleTask({
-			TaskName = "ScheduleNegativeDelayTask",
-			UseSilentOutput = true,
-			TaskExecutionDelay = -1,
-			TaskAction = function()
-				print("[ScheduleNegativeDelayTask] Task ran immediately")
 			end
 		})
 	end, {}, true),
@@ -368,47 +384,29 @@ local testingSuite = {
 		task.wait(2)
 	end, {}, false),
 
-	-- Test task descheduling and rescheduling
-	AddTestWithControl("DescheduleReschedule", function(TaskScheduler)
-		local taskExecuted = false
-
-		local taskId = TaskScheduler:ScheduleTask({
-			TaskName = "DescheduleRescheduleTask",
+	-- Schedule a task to run every 5 seconds and verify it runs multiple times
+	AddTestWithControl("ScheduleRecurringTask", function(TaskScheduler)
+		local TaskCount = 0
+		local TaskId = TaskScheduler:ScheduleTask({
+			TaskName = "ScheduleRecurringTask",
 			UseSilentOutput = true,
-			TaskExecutionDelay = 5,
+			TaskExecutionDelay = 1,
+			IsRecurringTask = true,
 			TaskAction = function()
-				taskExecuted = true
+				TaskCount = TaskCount + 1
+
+				if TaskCount == 3 then
+					TaskScheduler:Deschedule("ScheduleRecurringTask")
+					print("[ScheduleRecurringTask] Task ran 3 times and was descheduled")
+				end
 			end
 		})
 
-		TaskScheduler:Deschedule("DescheduleRescheduleTask")
+		task.wait(5)
 
-		task.wait(6)
-
-		if not taskExecuted then
-			--print("[DescheduleReschedule] Task successfully descheduled")
-		else
-			error("[DescheduleReschedule] Task execution after descheduling")
+		if TaskScheduler["ScheduleRecurringTask"] or TaskCount ~= 3 then
+			error("[ScheduleRecurringTask] Task was not successfully descheduled", 0)
 		end
-
-		TaskScheduler:ScheduleTask({
-			TaskName = "DescheduleRescheduleTask",
-			UseSilentOutput = true,
-			TaskExecutionDelay = 0,
-			TaskAction = function()
-				taskExecuted = true
-			end
-		})
-
-		task.wait(0.2)
-
-		if taskExecuted then
-			--print("[DescheduleReschedule] Task successfully rescheduled and executed")
-		else
-			error("[DescheduleReschedule] Task not executed after rescheduling")
-		end
-
-		print("[DescheduleReschedule] Task successfully rescheduled and executed")
 	end, {}, true),
 
 	-- Test edge cases
