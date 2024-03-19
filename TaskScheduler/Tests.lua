@@ -261,7 +261,7 @@ local testingSuite = {
 
 		task.wait(5)
 
-		if TaskScheduler["ScheduleRecurringTask"] or TaskCount > 3 then
+		if TaskScheduler["ScheduleRecurringTask"] or TaskCount ~= 3 then
 			error("[ScheduleRecurringTask] Task was not successfully descheduled", 0)
 		end
 	end, {}, true),
