@@ -444,7 +444,7 @@ local testingSuite = {
 			IsRecurringTask = true,
 			TaskExecutionDelay = 0,
 			TaskAction = function()
-				task.wait(20)
+				task.wait(15)
 			end
 		})
 

@@ -33,8 +33,13 @@ local TaskScheduler = {
 	Logger = {
 		Output = function(...)end
 	},
+
 	PerformanceManager = nil,
 };
+
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 -- Key Generation
 local i = 0;
@@ -45,7 +50,11 @@ local LoggerModule = require(script.Logger)
 local PerformanceManagerModule = require(script.PerformanceManager)
 local Task = require(script.Task)
 
+-- Constants
+local IsServer = RunService:IsServer();
+
 function TaskScheduler.new(Settings)
+	local Settings = Settings or TaskScheduler.Settings
 	return setmetatable({   
 		Tasks = {};
 		Settings = Settings,
@@ -59,7 +68,11 @@ function TaskScheduler.Initialize(this)
 	this.Logger:Initialize(this)
 	this.PerformanceManager:Initialize(this)
 	this.Task:Initialize(this)
-end
+
+	if IsServer then
+		this:ExposeAPI()
+	end;
+end;
 
 function TaskScheduler.ExecuteTask(this, Task: Task.Task)
 	-- if task is marked for deletion, fire the finishing event and delete the task from list
@@ -200,6 +213,72 @@ end
 
 function TaskScheduler.GetTask(this, TaskName)
 	return this.Tasks[TaskName];
+end
+
+function TaskScheduler.ExposeAPI(this)
+	local ServerMessageReceiver = Instance.new("BindableEvent");
+	local ServerFunction = Instance.new("BindableFunction");
+	local ClientMessageReceiver = Instance.new("RemoteEvent");
+	local ClientFunction = Instance.new("RemoteFunction");
+
+	ServerMessageReceiver.Name = "TaskSchedulerServerMessageReceiver";
+	ServerFunction.Name = "TaskSchedulerServerFunction";
+	ClientMessageReceiver.Name = "TaskSchedulerClientMessageReceiver";
+	ClientFunction.Name = "TaskSchedulerClientFunction";
+
+	ServerMessageReceiver.Parent = ReplicatedStorage;
+	ServerFunction.Parent = ReplicatedStorage;
+	ClientMessageReceiver.Parent = ReplicatedStorage;
+	ClientFunction.Parent = ReplicatedStorage;
+
+	local function HandleMessage(Message: string, ...: any)
+		local Arguments = {...};
+
+		-- Handle messages
+		if Message == "Deschedule" then
+			return this:Deschedule(Arguments[1], Arguments[2])
+		elseif Message == "GetTasks" then
+			return this.Tasks
+		elseif Message == "GetLogs" then
+			return this.Logger.OutputBuffer
+		elseif Message == "GetSettings" then
+			return this.Settings
+		elseif Message == "SetSetting" then
+			if #Arguments == 3 then
+				this.Settings[Arguments[1]][Arguments[2]] = Arguments[3]
+			else
+				this.Settings[Arguments[1]] = Arguments[2]
+			end
+		elseif Message == "PerformanceManager" then
+			if Arguments[1] == "GetTaskAverage" then
+				return this.PerformanceManager:GetTaskAverage(Arguments[2])
+			elseif Arguments[1] == "GetTaskMaximum" then
+				return this.PerformanceManager:GetTaskMaximum(Arguments[2])
+			elseif Arguments[1] == "GetDelayedExecutionCount" then
+				return this.PerformanceManager:GetDelayedExecutionCount(Arguments[2])
+			elseif Arguments[1] == "GetActiveTasks" then
+				return this.PerformanceManager:GetActiveTasks()
+			elseif Arguments[1] == "GetTasks" then
+				return this.PerformanceManager.Tasks
+			end
+		end
+	end
+
+	ServerMessageReceiver.Event:Connect(function(Player, Message, ...)
+		HandleMessage(Message, ...)
+	end)
+
+	ServerFunction.OnInvoke = function(Player, Message, ...)
+		return HandleMessage(Message, ...)
+	end
+
+	ClientMessageReceiver.OnServerEvent:Connect(function(Player, Message, ...)
+		HandleMessage(Message, ...)
+	end)
+
+	ClientFunction.OnServerInvoke = function(Player, Message, ...)
+		return HandleMessage(Message, ...)
+	end
 end
 
 -- Metatable indexes for TaskScheduler

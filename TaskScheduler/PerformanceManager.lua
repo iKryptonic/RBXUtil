@@ -121,7 +121,7 @@ PerformanceManager.GetTaskAverage = function(this, TaskName)
 	end
 
 	-- Calculate and return the average execution time
-	return TotalTime / #ExecutionTimes
+	return TotalTime / math.max(#ExecutionTimes, 1)
 end
 
 --[[

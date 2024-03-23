@@ -29,6 +29,7 @@ local TaskManager = {
 
 	ActivePage = nil,
 	TaskScheduler = nil,
+	Mode = 'client'
 };
 
 -- Services
@@ -56,7 +57,12 @@ local BottomBarMetadata = {
 		UpdateFunction = function(this)
 			if not TaskManager.TaskScheduler then return end;
 			
-			local TaskCount = TaskManager.TaskScheduler:GetTaskCount();
+			local Tasks= TaskManager.TaskScheduler.Tasks;
+
+			local TaskCount = 0;
+			for _, _ in next, Tasks do
+				TaskCount += 1;
+			end;
 
 			this.ObjectReference.Text = "[Task Count] " .. tostring(TaskCount);
 		end,
@@ -65,6 +71,8 @@ local BottomBarMetadata = {
 	["TaskQueue"] = {
 		UpdateFunction = function(this)
 			if not TaskManager.TaskScheduler then return end;
+			if not TaskManager.Mode == 'client' then return end; -- unsupported for serverside
+
 			local TaskQueue = TaskManager.TaskScheduler.PerformanceManager:GetActiveTasks();
 			local Count = 0;
 
@@ -166,10 +174,10 @@ local Pages = {
 				if not TaskManager.TaskScheduler then return end;
 
 				local SelectedTask = this.Constants.SelectedTask;
-				local TaskData = TaskManager.TaskScheduler:GetTask(SelectedTask);
+				local TaskData = TaskManager.TaskScheduler[SelectedTask];
 				
 				if not TaskData then
-					SelectedTask = nil;
+					this.Constants.SelectedTask = nil;
 					ClearTaskMetadata();
 				return;
 				end;
@@ -202,7 +210,7 @@ local Pages = {
 					-- Only update value if it is not a function
 					if typeof(DataValue) == "function" then continue end;
 
-					local DataValue = (typeof(DataValue) == "number" and math.round(DataValue) or DataValue);
+					local DataValue = (typeof(DataValue) == "number" and DataValue or DataValue);
 
 					local TaskDataObject = TaskMetadataContainer:FindFirstChild(DataName);
 
@@ -225,6 +233,7 @@ local Pages = {
 		Connections = {},
 
 		UpdateFunction = function(this)
+			if not TaskManager.Mode == 'client' then return end; -- unsupported for serverside
 			local function ClearTaskMetadata()
 				for _, TaskData in next, this.Container.TaskMetadata:GetChildren() do
 					if not TaskData:IsA("TextLabel") then continue end;
@@ -275,10 +284,8 @@ local Pages = {
 
 				-- Add tasks that are not in the task scheduler
 				for TaskName, Task in next, Tasks do
-					if not Task.IsRecurringTask then continue end;
-					
-					if not this.Container.TaskList:FindFirstChild(Task.TaskName) then
-						CreateTaskCard(Task.TaskName);
+					if not this.Container.TaskList:FindFirstChild(TaskName) then
+						CreateTaskCard(TaskName);
 					end;
 				end;
 			end;
@@ -287,17 +294,21 @@ local Pages = {
 				if not this.Constants.SelectedTask then return end;
 				if not TaskManager.TaskScheduler then return end;
 
+				local function FormatTime(time: number)
+					if time < 0.001 then
+						return tostring(math.floor(time * 1000000 + 0.5)) .. "ns"
+					elseif time < 1 then
+						return tostring(math.floor(time * 1000 + 0.5)) .. "ms"
+					else
+						return tostring(math.floor(time + 0.5)) .. "s"
+					end
+				end
+
 				local SelectedTask = this.Constants.SelectedTask;
 				local TaskData = {};
-				TaskData.AverageExecutionTime = TaskManager.TaskScheduler.PerformanceManager:GetTaskAverage(SelectedTask);
-				TaskData.MaximumExecutionTime = TaskManager.TaskScheduler.PerformanceManager:GetTaskMaximum(SelectedTask);
+				TaskData.AverageExecutionTime = FormatTime(TaskManager.TaskScheduler.PerformanceManager:GetTaskAverage(SelectedTask));
+				TaskData.MaximumExecutionTime = FormatTime(TaskManager.TaskScheduler.PerformanceManager:GetTaskMaximum(SelectedTask));
 				TaskData.DelayedExecutions = TaskManager.TaskScheduler.PerformanceManager:GetDelayedExecutionCount(SelectedTask);
-				
-				if not TaskData then
-					SelectedTask = nil;
-					ClearTaskMetadata();
-				return;
-				end;
 				
 				local TaskMetadataContainer = this.Container.TaskMetadata;
 
@@ -313,7 +324,7 @@ local Pages = {
 
 				-- Create all task data fields
 				for DataName, DataValue in next, TaskData do
-					if (typeof(DataValue == "table") or typeof(DataValue) == "function") then continue end;
+					if (typeof(DataValue) == "table" or typeof(DataValue) == "function") then continue end;
 					
 					if not TaskMetadataContainer:FindFirstChild(DataName) then
 						if DataValue == nil then continue end;
@@ -325,9 +336,9 @@ local Pages = {
 				-- Update all task data fields
 				for DataName, DataValue in next, TaskData do
 					-- Only update value if it is not a function
-					if (typeof(DataValue == "table") or typeof(DataValue) == "function") then continue end;
+					if (typeof(DataValue) == "table" or typeof(DataValue) == "function") then continue end;
 
-					local DataValue = (typeof(DataValue) == "number" and math.round(DataValue) or DataValue);
+					local DataValue = DataValue;
 
 					local TaskDataObject = TaskMetadataContainer:FindFirstChild(DataName);
 
@@ -602,9 +613,9 @@ local Pages = {
 					end,
 					description = "Flush the output buffer",
 					options = {
-						l = "The amount of lines to flush",
-						m = "The minimum log level to flush",
-						s = "Search logs for string"
+						l = "Amount of lines",
+						m = "Minimum log level",
+						s = "Search logs"
 					}
 				}
 
@@ -628,14 +639,18 @@ local Pages = {
 				Commands.task = {
 					action = function(options)
 						local TaskName = options.n;
-						local Task = TaskManager.TaskScheduler:GetTask(TaskName);
+						local Task = TaskManager.TaskScheduler[TaskName];
 
 						if not Task then
 							return "Task not found";
 						end;
 
 						if options.k then
-							TaskManager.TaskScheduler:Deschedule(TaskName);
+							if (TaskManager.Mode == 'client') then
+								TaskManager.TaskScheduler:Deschedule(TaskName);
+							else
+								-- Implement server option
+							end;
 							return "Deschedule task " .. TaskName;
 						elseif options.r then
 							Task:Reset();
@@ -661,11 +676,11 @@ local Pages = {
 					end,
 					description = "Perform an action on a task",
 					options = {
-						n = "The name of the task",
-						k = "Kill the task",
-						r = "Reset the task",
-						x = "Immediately execute the task",
-						i = "Get information about the task"
+						n = "TaskName (req.)",
+						k = "Kill task",
+						r = "Reset task",
+						x = "Execute Task",
+						i = "Task info"
 					}
 				}
 
@@ -732,44 +747,58 @@ local Pages = {
 			local taskScheduler = TaskManager.TaskScheduler
 			if not taskScheduler then return end
 		
-			local function UpdateSettingField(SettingName, SettingValue, SubTable)
+			local function UpdateSettingField(SettingName, SettingValue)
 				local SettingField = this.Container:FindFirstChild(SettingName)
 				if not SettingField then return end
 		
-				local SettingFieldInput = SettingField:FindFirstChild(SettingValue and "Bool" or "Text")
+				local SettingType = typeof(SettingValue)
+				local SettingFieldInput = SettingField:FindFirstChild(SettingType == "boolean" and "Bool" or "Text")
+				if not SettingFieldInput then return end
 		
-				if SettingValue == nil then return end -- Handle cases where the setting value is nil
-				
-				SettingFieldInput.Text = SettingValue and "Enabled" or "Disabled"
+				SettingFieldInput.Text = (SettingType == "boolean") and (SettingValue and "Enabled" or "Disabled") or tostring(SettingValue)
 			end
 		
 			local function CreateSettingField(SettingName, SettingValue, SubTable)
 				if this.Container:FindFirstChild(SettingName) then return end
 		
 				local SettingField = ObjectReferences.SettingReference:Clone()
-				local SettingType = type(SettingValue)
+				local SettingType = typeof(SettingValue)
 				local SettingFieldInput = SettingField:FindFirstChild(SettingType == "boolean" and "Bool" or "Text")
 				if not SettingFieldInput then return end
 		
 				SettingField.Name = SettingName
 				SettingField:FindFirstChild("Title").Text = SettingName
-				SettingField:FindFirstChild("Title").Name = SubTable and SubTable or "TreeHead"
-				SettingFieldInput.Text = SettingType == "boolean" and (SettingValue and "Enabled" or "Disabled") or tostring(SettingValue)
+				SettingField:FindFirstChild("Title").Name = SubTable or "TreeHead"
+				SettingFieldInput.Text = (SettingType == "boolean") and (SettingValue and "Enabled" or "Disabled") or tostring(SettingValue)
 		
 				-- Hook setting events
 				local InputConnection
 				if SettingType == "boolean" then
 					InputConnection = SettingFieldInput.MouseButton1Click:Connect(function()
-						local NewValue = not taskScheduler.Settings[SubTable and SubTable or SettingName]
-						taskScheduler.Settings[SubTable and SubTable or SettingName] = NewValue
-						UpdateSettingField(SettingName, NewValue, SubTable)
+						local NewValue = nil;
+						
+						if SubTable then
+							taskScheduler.Settings[SubTable][SettingName] = not taskScheduler.Settings[SubTable][SettingName]
+							NewValue = taskScheduler.Settings[SubTable][SettingName]
+						else
+							taskScheduler.Settings[SettingName] = not taskScheduler.Settings[SettingName]
+							NewValue = taskScheduler.Settings[SettingName]
+						end;
+
+						UpdateSettingField(SettingName, NewValue)
 					end)
 				else
 					InputConnection = SettingFieldInput.FocusLost:Connect(function(EnterPressed)
 						if not EnterPressed then return end
-						local NewValue = SettingType == "number" and tonumber(SettingFieldInput.Text) or SettingFieldInput.Text
-						taskScheduler.Settings[SubTable and SubTable or SettingName] = NewValue
-						UpdateSettingField(SettingName, NewValue, SubTable)
+
+						local NewValue = tonumber(SettingFieldInput.Text);
+						if SubTable then
+							taskScheduler.Settings[SubTable][SettingName] = NewValue
+						else
+							taskScheduler.Settings[SettingName] = NewValue
+						end;
+
+						UpdateSettingField(SettingName, NewValue)
 					end)
 				end
 		
@@ -797,7 +826,7 @@ local Pages = {
 		
 				if type(SettingValue) == "table" then
 					for SubSettingName, SubSettingValue in pairs(SettingValue) do
-						UpdateSettingField(SubSettingName, SubSettingValue, SettingName)
+						UpdateSettingField(SubSettingName, SubSettingValue)
 					end
 				else
 					UpdateSettingField(SettingName, SettingValue)
@@ -848,9 +877,33 @@ TaskManager.UpdateBottomBar = function(this)
 	end;
 end;
 
+-- Create Pseudo-TaskScheduler (For serverside operations)
+TaskManager.CreatePseudoTaskScheduler = function()
+	return shared.TaskScheduler;
+
+	--[[
+		local TaskScheduler = {};
+		local TaskSchedulerMeta = {};
+		TaskSchedulerMeta.__index = function(_, Index)
+			if TaskManager.Mode == 'client' then
+				return shared.TaskScheduler[Index];
+			else
+				if Index == "PerformanceManager" then
+					-- Implement pseudo PerformanceManager
+				else
+					-- Implement server side call
+				end
+				return nil-- Return yieldable call from RemoteFunction
+			end
+		end;
+
+		return setmetatable(TaskScheduler, TaskSchedulerMeta);
+	]]
+end;
+
 -- Initialize
-TaskManager.Initialize = function(this, TaskScheduler)
-	this.TaskScheduler = TaskScheduler;
+TaskManager.Initialize = function(this)
+	this.TaskScheduler = this:CreatePseudoTaskScheduler();
 
 	-- Initialize pages
 	for _, Page in next, Pages do

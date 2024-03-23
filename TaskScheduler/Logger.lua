@@ -27,13 +27,9 @@ end
     @param OutputText: The text to output
     @param ...: The arguments to format the text with
 
-    TODO:
-    Append calling script to the output
-
 ]]
 function Logger.Output(LogLevel: number, OutputText: string, ...: string)
 	local FormattedOutputString: string = OutputText:format(...)
-	if Logger.Settings.MinimumLoggingLevel > LogLevel then return end
 
 	if Logger.Settings.DebuggingEnabled then
 		table.insert(Logger.OutputBuffer, {Type=LogLevel, Message=FormattedOutputString, Time=os.time()})
