@@ -48,12 +48,13 @@ end
     Begins tracking the execution time of a task.
     @param TaskName (string): The name of the task.
 --]]
-PerformanceManager.TaskBegin = function(this, TaskName)
+PerformanceManager.TaskBegin = function(this, TaskName, TaskData)
 	-- Initialize task data
 	this.Tasks[TaskName] = {
 		TaskStartTime = os.clock(),
 		TaskEndTime = nil,
-		IsTaskRunning = true
+		IsTaskRunning = true,
+		TaskData = table.clone(TaskData)
 	}
 end
 
@@ -62,6 +63,7 @@ end
     @param TaskName (string): The name of the task.
 --]]
 PerformanceManager.TaskEnd = function(this, TaskName)
+	this.TaskExecutionRunningTimeList[TaskName] = this.TaskExecutionRunningTimeList[TaskName] or {}
 	-- Fetch task details
 	local Task = this.Tasks[TaskName]
 
@@ -87,7 +89,7 @@ PerformanceManager.TaskEnd = function(this, TaskName)
 	-- Check for long thread execution
 	local MaxWarningThreshold = this.Settings.MaximumThreadWarningThreshold
 
-	if this.Settings.WarnOnLongThreadExecutions and MaxWarningThreshold < DeltaTimeToExecuteTask then
+	if this.Settings.WarnOnLongThreadExecutions and (MaxWarningThreshold < DeltaTimeToExecuteTask) then
 		local ExceededThreshold = DeltaTimeToExecuteTask - MaxWarningThreshold
 		this.Logger.Output(2, "TaskEnd - Long Thread Runtime [%s] - Ran for %d seconds. \n\t This is %d seconds longer than our set timer for %d", TaskName, DeltaTimeToExecuteTask, ExceededThreshold, MaxWarningThreshold)
 	end
@@ -102,6 +104,7 @@ end
     @return (number): The average execution time.
 --]]
 PerformanceManager.GetTaskAverage = function(this, TaskName)
+	this.TaskExecutionRunningTimeList[TaskName] = this.TaskExecutionRunningTimeList[TaskName] or {}
 	-- Retrieve execution times for the task
 	local ExecutionTimes = this.TaskExecutionRunningTimeList[TaskName]
 
@@ -125,7 +128,7 @@ end
     Retrieves information about all active tasks.
     @return (table): A table containing information about active tasks.
 --]]
-PerformanceManager.GetAllTasks = function(this)
+PerformanceManager.GetActiveTasks = function(this)
 	-- Initialize an empty table to store the result
 	local Result = {}
 
@@ -146,13 +149,68 @@ PerformanceManager.GetAllTasks = function(this)
 	return Result
 end
 
+--[[
+	Retrieves information about all delayed task executions.
+	@return (table): A table containing information about delayed task executions.
+]]
+PerformanceManager.GetDelayedTaskExecutions = function(this)
+	-- Initialize an empty table to store the result
+	local Result = {}
+
+	-- Iterate over all delayed task executions
+	for TaskName, DelayedExecutionList in pairs(this.DelayedTaskExecutions) do
+		-- Add information about the delayed task executions to the result table
+		Result[TaskName] = DelayedExecutionList
+	end
+
+	-- Return the result table containing information about delayed task executions
+	return Result
+end
+
+--[[ 
+	Retrieves information about all tracked errors.
+	@return (table): A table containing information about tracked errors.
+--]]
+PerformanceManager.GetTrackedErrors = function(this)
+	-- Initialize an empty table to store the result
+	local Result = {}
+
+	-- Iterate over all tracked errors
+	for TaskName, ErrorData in pairs(this.TrackedErrorList) do
+		-- Add information about the tracked errors to the result table
+		Result[TaskName] = ErrorData
+	end
+
+	-- Return the result table containing information about tracked errors
+	return Result
+end
+
+--[[ 
+	Retrieves information about a specific task.
+	@param TaskName (string): The name of the task.
+	@return (table): Information about the task such as errors, delayed executions, etc.
+--]]
+PerformanceManager.GetTask = function(this, TaskName)
+	-- Initialize an empty table to store the result
+	local Result = {}
+
+	-- Add information about the task to the result table
+	Result.TaskData = this.Tasks[TaskName]
+	Result.DuplicateFrames = this.TaskDuplicateFrameList[TaskName]
+	Result.TrackedErrors = this.TrackedErrorList[TaskName]
+	Result.AverageExecutionTime = this:GetTaskAverage(TaskName)
+
+	-- Return the result table containing information about the task
+	return Result
+end
+
 --[[ 
     Retrieves data associated with a specific task.
     @param TaskName (string): The name of the task.
     @return (table): Information about the task, duplicate frames, and tracked errors.
 --]]
 PerformanceManager.GetTaskData = function(this, TaskName)
-	return this.Tasks[TaskName], this.TaskDuplicateFrameList[TaskName], this.TrackedErrorList[TaskName]
+	return this.Tasks[TaskName]
 end
 
 --[[ 
@@ -178,7 +236,7 @@ end
     @param Delay (number): The delay in seconds.
 ]]
 PerformanceManager.LogDelayedExecution = function(this, TaskName, Delay)
-	-- Create new entry for task logging time which we hit the delay as well as the delay itthis
+	-- Create new entry for task logging time which we hit the delay as well as the delay itself
 	local DelayedExecutionEntry = {
 		Delay = Delay,
 		Time = tick()
@@ -200,7 +258,7 @@ PerformanceManager.TrackError = function(this, TaskName, ErrorText)
 	-- Check if error debouncer is disabled
 	if not this.Settings.ErrorDebouncerEnabled then
 		-- Print the error message and stack trace
-		this.Logger.Output(2, ErrorText)
+		this.Logger.Output(3, ErrorText)
 		this.Logger.Output(2, debug.traceback())
 		return
 	end
@@ -234,7 +292,7 @@ PerformanceManager.TrackError = function(this, TaskName, ErrorText)
 		ErrorTable.error = ErrorText
 
 		-- Print the error message with task name and error count
-		this.Logger.Output(2, 'TrackError - TASK [%s] EXCEPTION: %s (x%d)', TaskName, ErrorText, ErrorTable.n)
+		this.Logger.Output(3, 'TrackError - TASK [%s] EXCEPTION: %s (x%d)', TaskName, ErrorText, ErrorTable.n)
 
 		-- Check if runaway tasks should be killed and if the error count exceeds the threshold
 		if this.Settings.KillRunawayTasks and ErrorTable.n > this.Settings.RunawayTaskThreshold then

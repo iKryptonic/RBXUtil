@@ -15,6 +15,7 @@ export type Task = {
 	AllowDuplicateFrames: boolean?,
 	MarkedForDeletion: boolean,
 	Locked: boolean,
+	CallingScript: string?,
 	Reset: (Task) -> (),
 	LockEntity: (Task) -> (),
 	UnlockEntity: (Task) -> (),
@@ -24,10 +25,10 @@ export type Task = {
 
 local Task = {
 	TaskScheduler = {
-		ExecuteTask = function(...)end;
+		ExecuteTask = function(...)end
 	},
 	Logger = {
-		Output = function(...)end;
+		Output = function(...)end
 	},
 }
 
@@ -38,6 +39,7 @@ end
 
 function Task.new(TaskData)
 	local newTask: Task = {
+		-- mutable task attributes
 		TaskName = TaskData.TaskName,
 		TaskAction = TaskData.TaskAction,
 		TaskExecutionDelay = TaskData.TaskExecutionDelay,
@@ -45,9 +47,13 @@ function Task.new(TaskData)
 		IsRecurringTask = TaskData.IsRecurringTask,
 		UseSilentOutput = TaskData.UseSilentOutput,
 		AllowDuplicateFrames = TaskData.AllowDuplicateFrames,
+		CallingScript = (getfenv(3).script and getfenv(3).script.Name or "Unknown"),
+
+		-- Begin static task attributes
 		MarkedForDeletion = false, -- Marked to be deleted on next task execution
 		Locked = false, -- Currently handled by ExecuteTask
-		
+
+		-- immutable task attributes
 		Reset = function(this: Task)
 			this.TaskRemainingTimeToExecution = this.TaskExecutionDelay
 		end,
@@ -86,11 +92,11 @@ function Task.new(TaskData)
 
 			if not this.IsRecurringTask then
 				this.MarkedForDeletion = true;
-			end;
+			end
 
 			return TaskWrapperReturnedValue
 		end,
-		}
+	}
 
 	return newTask
 end

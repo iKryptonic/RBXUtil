@@ -9,15 +9,15 @@ local DefaultSettings = {
 		WarnOnLongThreadExecutions = true,
 		MaximumThreadWarningThreshold = 12.5,
 		KillRunawayTasks = true,
-		RunawayTaskThreshold = 50,
+		RunawayTaskThreshold = 5,
 		ErrorDebouncerEnabled = true,
 		ErrorDebounceTime = 1,
 		ErrorExpireTime = 10
 	},
 
 	LoggerSettings = {
-		DebuggingEnabled = false,
-		MinimumLoggingLevel = 2,
+		DebuggingEnabled = true,
+		MinimumLoggingLevel = 3,
 	},
 
 	ThrottleThreadCreation = true,
@@ -51,7 +51,8 @@ end
 local function RunTestSuite(testSuite)
 	local taskScheduler = TaskSchedulerModule.new(DefaultSettings)
 	taskScheduler.Initialize(taskScheduler)
-
+	shared.TaskScheduler = taskScheduler
+	
 	RunService.Heartbeat:Connect(function(deltaTime)
 		taskScheduler:TaskSchedulerStep(deltaTime)
 	end)
@@ -89,13 +90,28 @@ local function AddTestWithControl(testName, testFunction, schedulerSettings, par
 	}
 end
 
+local function FindLogResult(logger, stringToMatch)
+	local function CheckForString()
+		for _, log in pairs(logger.OutputBuffer) do
+			if string.find(log.Message, stringToMatch) then
+				return log.Message
+			end
+		end
+		return false
+	end
+
+	repeat task.wait() until CheckForString()
+
+	return CheckForString()
+end
+
 -- Tests
 local testingSuite = {
 	-- Schedule a task to run in 5 seconds
 	AddTestWithControl("ScheduleTask", function(TaskScheduler)
 		TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 5,
 			TaskAction = function()
 				print("[ScheduleTask] Task ran after 5 seconds")
@@ -105,32 +121,35 @@ local testingSuite = {
 
 	-- Schedule a task to run in 5 seconds and cancel it
 	AddTestWithControl("CancelTask", function(TaskScheduler)
+		local DidRun = false;
+		
 		local TaskId = TaskScheduler:ScheduleTask({
 			TaskName = "CancelTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 5,
 			TaskAction = function()
+				DidRun = true;
 				error("[CancelTask] Should not have been executed", 0)
 			end
 		})
 
 		TaskScheduler:Deschedule("CancelTask")
 
-		task.wait(5)
+		task.wait(8)
 		if TaskScheduler:GetTask("CancelTask") then
 			error("[CancelTask] Task was not successfully descheduled", 0)
 		else
 			print("[CancelTask] Task was successfully descheduled")
 		end
 	end, {}, false),	
-	
+
 	-- Test task descheduling and rescheduling
 	AddTestWithControl("DescheduleReschedule", function(TaskScheduler)
 		local taskExecuted = false
 
 		local taskId = TaskScheduler:ScheduleTask({
 			TaskName = "DescheduleRescheduleTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 5,
 			TaskAction = function()
 				taskExecuted = true
@@ -149,7 +168,7 @@ local testingSuite = {
 
 		TaskScheduler:ScheduleTask({
 			TaskName = "DescheduleRescheduleTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 0,
 			TaskAction = function()
 				taskExecuted = true
@@ -169,7 +188,7 @@ local testingSuite = {
 	AddTestWithControl("ScheduleImmediateTask", function(TaskScheduler)
 		TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleImmediateTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 0,
 			TaskAction = function()
 				print("[ScheduleImmediateTask] Task ran immediately")
@@ -181,7 +200,7 @@ local testingSuite = {
 	AddTestWithControl("ScheduleNegativeDelayTask", function(TaskScheduler)
 		TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleNegativeDelayTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = -1,
 			TaskAction = function()
 				print("[ScheduleNegativeDelayTask] Task ran immediately")
@@ -196,7 +215,7 @@ local testingSuite = {
 
 		TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleShortDelayedTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = Delay,
 			TaskAction = function()
 				local EndTime = tick()
@@ -220,7 +239,7 @@ local testingSuite = {
 
 		TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleMediumDelayedTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = Delay,
 			TaskAction = function()
 				local EndTime = tick()
@@ -244,7 +263,7 @@ local testingSuite = {
 
 		TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleLongDelayedTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = Delay,
 			TaskAction = function()
 				local EndTime = tick()
@@ -349,7 +368,7 @@ local testingSuite = {
 
 		local TaskId = TaskScheduler:ScheduleTask({
 			TaskName = "RunawayTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 0,
 			IsRecurringTask = true,
 			TaskAction = function()
@@ -389,7 +408,7 @@ local testingSuite = {
 		local TaskCount = 0
 		local TaskId = TaskScheduler:ScheduleTask({
 			TaskName = "ScheduleRecurringTask",
-			UseSilentOutput = true,
+			UseSilentOutput = false,
 			TaskExecutionDelay = 1,
 			IsRecurringTask = true,
 			TaskAction = function()
@@ -409,11 +428,33 @@ local testingSuite = {
 		end
 	end, {}, true),
 
+	-- Test a task that runs for a minute
+	AddTestWithControl("LongRunningTask", function(TaskScheduler)
+		local TaskId = TaskScheduler:ScheduleTask({
+			TaskName = "LongRunningTask",
+			UseSilentOutput = false,
+			IsRecurringTask = true,
+			TaskExecutionDelay = 0,
+			TaskAction = function()
+				task.wait(20)
+			end
+		})
+
+		local LogResult = FindLogResult(TaskScheduler.Logger, "Long Thread Runtime")
+
+		if LogResult then
+			print("[LongRunningTask] Task overran safe thread execution time")
+			TaskScheduler:Deschedule("LongRunningTask")
+		else
+			error("[LongRunningTask] Task did not run for a minute")
+		end
+	end, {}, true),
+
 	-- Test edge cases
 	AddTestWithControl("InvalidInputTest", function(TaskScheduler)
 		local success, error = pcall(function()
 			TaskScheduler:ScheduleTask({
-				UseSilentOutput = true,
+				UseSilentOutput = false,
 				TaskExecutionDelay = "invalid",
 				TaskAction = function()
 					error("Invalid input test")
