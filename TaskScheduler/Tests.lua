@@ -384,8 +384,10 @@ local testingSuite = {
 
 		task.wait(3)
 
-		if TaskScheduler.PerformanceManager.TrackedErrorList["RunawayTask"].n > 0 then
+		if TaskScheduler.PerformanceManager.TrackedErrorList["RunawayTask"] and TaskScheduler.PerformanceManager.TrackedErrorList["RunawayTask"].n > 0 then
 			RunawayTaskCount = TaskScheduler.PerformanceManager.TrackedErrorList["RunawayTask"].n
+		else
+			error("[RunawayTask] Task did not hit runaway", 0)
 		end
 
 		if TaskScheduler["RunawayTask"] then

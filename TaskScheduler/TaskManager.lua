@@ -2,6 +2,11 @@
     TaskManager.lua
 	@Author: ikrypto
 	@Date: 03-19-2024
+
+	TODO: -Revamp performance tab to utilize the
+			TaskScheduler's performance manager fully 
+			through dynamic views
+		  -Implement more commands for console
 ]]
 
 -- Owner
@@ -215,10 +220,125 @@ local Pages = {
 		Container = TaskManager.GUI.BodyContainer.PerformanceView.Container,
 		Tab = TaskManager.GUI.TabContainer.Performance,
 		Constants = {
+			SelectedTask = nil,
 		},
 		Connections = {},
 
 		UpdateFunction = function(this)
+			local function ClearTaskMetadata()
+				for _, TaskData in next, this.Container.TaskMetadata:GetChildren() do
+					if not TaskData:IsA("TextLabel") then continue end;
+
+					TaskData:Destroy();
+				end;
+			end;
+
+			local function UpdateTaskList()
+				if not TaskManager.TaskScheduler then return end;
+				-- Get the tasks
+				local Tasks = TaskManager.TaskScheduler.PerformanceManager.Tasks;
+
+				-- Helper method for creating task cards
+				local function CreateTaskCard(TaskName: string)
+					local TaskCard = ObjectReferences.TaskCardReference:Clone();
+					local TaskLabelObject = TaskCard:FindFirstChildWhichIsA("TextLabel");
+
+					-- Hook into click event
+					local TaskCardConnection = TaskCard.MouseButton1Click:Connect(function()
+						this.Constants.SelectedTask = nil;
+						ClearTaskMetadata();
+						this.Constants.SelectedTask = TaskName;
+					end);
+
+					TaskLabelObject.Text = TaskName;
+					TaskCard.Name = TaskName;
+					TaskCard.Parent = this.Container.TaskList;
+					TaskCard.Visible = true;
+					table.insert(this.Connections, TaskCardConnection);
+
+					return TaskCard;
+				end;
+
+				-- Remove tasks that are no longer in the task scheduler
+				for _, TaskCard in next, this.Container.TaskList:GetChildren() do
+					if not TaskCard:IsA("TextButton") then continue end;
+
+					if not Tasks[TaskCard.Name] then
+						TaskCard:Destroy();
+
+						if this.Constants.SelectedTask and (this.Constants.SelectedTask == TaskCard.Name) then
+							this.Constants.SelectedTask = nil;
+							ClearTaskMetadata();
+						end;
+					end;
+				end;
+
+				-- Add tasks that are not in the task scheduler
+				for TaskName, Task in next, Tasks do
+					if not Task.IsRecurringTask then continue end;
+					
+					if not this.Container.TaskList:FindFirstChild(Task.TaskName) then
+						CreateTaskCard(Task.TaskName);
+					end;
+				end;
+			end;
+
+			local function UpdateSelectedTaskMetadata()
+				if not this.Constants.SelectedTask then return end;
+				if not TaskManager.TaskScheduler then return end;
+
+				local SelectedTask = this.Constants.SelectedTask;
+				local TaskData = {};
+				TaskData.AverageExecutionTime = TaskManager.TaskScheduler.PerformanceManager:GetTaskAverage(SelectedTask);
+				TaskData.MaximumExecutionTime = TaskManager.TaskScheduler.PerformanceManager:GetTaskMaximum(SelectedTask);
+				TaskData.DelayedExecutions = TaskManager.TaskScheduler.PerformanceManager:GetDelayedExecutionCount(SelectedTask);
+				
+				if not TaskData then
+					SelectedTask = nil;
+					ClearTaskMetadata();
+				return;
+				end;
+				
+				local TaskMetadataContainer = this.Container.TaskMetadata;
+
+				local function CreateTaskData(DataKey)
+					local TaskDataObject = ObjectReferences.TaskDataReference:Clone();
+					local TaskDataTitleObject = TaskDataObject:FindFirstChild("Title");
+
+					TaskDataObject.Name = DataKey;
+					TaskDataTitleObject.Text = DataKey;
+					TaskDataObject.Parent = TaskMetadataContainer;
+					TaskDataObject.Visible = true;
+				end;
+
+				-- Create all task data fields
+				for DataName, DataValue in next, TaskData do
+					if (typeof(DataValue == "table") or typeof(DataValue) == "function") then continue end;
+					
+					if not TaskMetadataContainer:FindFirstChild(DataName) then
+						if DataValue == nil then continue end;
+						
+						CreateTaskData(DataName);
+					end;
+				end;
+
+				-- Update all task data fields
+				for DataName, DataValue in next, TaskData do
+					-- Only update value if it is not a function
+					if (typeof(DataValue == "table") or typeof(DataValue) == "function") then continue end;
+
+					local DataValue = (typeof(DataValue) == "number" and math.round(DataValue) or DataValue);
+
+					local TaskDataObject = TaskMetadataContainer:FindFirstChild(DataName);
+
+					if TaskDataObject then
+						TaskDataObject.Text = tostring(DataValue);
+					end;
+				end;
+			end;
+
+			UpdateTaskList();
+			UpdateSelectedTaskMetadata();
 		end;
 	},
 	["Console"] = {
@@ -502,6 +622,50 @@ local Pages = {
 					description = "Set the output limit of the console",
 					options = {
 						l = "The limit to set"
+					}
+				}
+
+				Commands.task = {
+					action = function(options)
+						local TaskName = options.n;
+						local Task = TaskManager.TaskScheduler:GetTask(TaskName);
+
+						if not Task then
+							return "Task not found";
+						end;
+
+						if options.k then
+							TaskManager.TaskScheduler:Deschedule(TaskName);
+							return "Deschedule task " .. TaskName;
+						elseif options.r then
+							Task:Reset();
+							return "Reset task " .. TaskName;
+						elseif options.x then
+							Task:Execute();
+							return "Executed task " .. TaskName;
+						elseif options.i then
+							local TaskData = {};
+							for DataName, DataValue in next, Task do
+								TaskData[DataName] = DataValue;
+							end;
+
+							local TaskDataString = "";
+							for DataName, DataValue in next, TaskData do
+								TaskDataString = TaskDataString .. DataName .. ": " .. tostring(DataValue) .. "\n";
+							end;
+
+							return TaskDataString;
+						end;
+
+						return "No action specified";
+					end,
+					description = "Perform an action on a task",
+					options = {
+						n = "The name of the task",
+						k = "Kill the task",
+						r = "Reset the task",
+						x = "Immediately execute the task",
+						i = "Get information about the task"
 					}
 				}
 

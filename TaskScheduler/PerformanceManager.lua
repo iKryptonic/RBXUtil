@@ -54,7 +54,7 @@ PerformanceManager.TaskBegin = function(this, TaskName, TaskData)
 		TaskStartTime = os.clock(),
 		TaskEndTime = nil,
 		IsTaskRunning = true,
-		TaskData = table.clone(TaskData)
+		TaskData = TaskData
 	}
 end
 
@@ -124,6 +124,32 @@ PerformanceManager.GetTaskAverage = function(this, TaskName)
 	return TotalTime / #ExecutionTimes
 end
 
+--[[
+	Retrieves the maximum execution time of a task.
+	@param TaskName (string): The name of the task.
+	@return (number): The maximum execution time.
+]]
+PerformanceManager.GetTaskMaximum = function(this, TaskName)
+	this.TaskExecutionRunningTimeList[TaskName] = this.TaskExecutionRunningTimeList[TaskName] or {}
+	-- Retrieve execution times for the task
+	local ExecutionTimes = this.TaskExecutionRunningTimeList[TaskName]
+
+	-- If no execution times are found, print a warning and return nil
+	if not ExecutionTimes then
+		this.Logger.Output(2, "GetTaskMax - Could not find Task %s", TaskName)
+		return
+	end
+
+	-- Calculate the maximum execution time
+	local MaxTime = 0
+	for _, Time in ipairs(ExecutionTimes) do
+		MaxTime = math.max(MaxTime, Time)
+	end
+
+	-- Return the maximum execution time
+	return MaxTime
+end
+
 --[[ 
     Retrieves information about all active tasks.
     @return (table): A table containing information about active tasks.
@@ -147,6 +173,24 @@ PerformanceManager.GetActiveTasks = function(this)
 
 	-- Return the result table containing information about active tasks
 	return Result
+end
+
+--[[
+	Retrives the amount of delayed task executions for a task.
+	@param TaskName (string): The name of the task
+	@return (number): The amount of delayed task executions.
+]]
+PerformanceManager.GetDelayedExecutionCount = function(this, TaskName)
+	-- Retrieve the list of delayed task executions for the task
+	local DelayedExecutionList = this.DelayedTaskExecutions[TaskName]
+
+	-- If no delayed task executions are found, return 0
+	if not DelayedExecutionList then
+		return 0
+	end
+
+	-- Return the amount of delayed task executions
+	return #DelayedExecutionList
 end
 
 --[[

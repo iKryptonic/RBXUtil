@@ -85,7 +85,7 @@ function TaskScheduler.ExecuteTask(this, Task: Task.Task)
 				this.PerformanceManager:LogDuplicateFrame(Task.TaskName)
 				return
 			end
-			this.PerformanceManager:TaskBegin(Task.TaskName, Task)
+			this.PerformanceManager:TaskBegin(Task.TaskName)
 		end
 
 		-- Execute the task function and catch errors

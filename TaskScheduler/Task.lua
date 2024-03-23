@@ -77,8 +77,7 @@ function Task.new(TaskData)
 
 		Execute = function(this:Task)
 			if this.Locked then
-				Task.Logger.Output(3, "TaskScheduler: Task %s is currently locked and cannot be executed.", this.TaskName)
-				return
+				return Task.Logger.Output(3, "TaskScheduler: Task %s is currently locked and cannot be executed.", this.TaskName)
 			end
 
 			this:LockEntity()
