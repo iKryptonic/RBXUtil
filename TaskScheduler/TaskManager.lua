@@ -27,6 +27,23 @@ local TaskManager = {
 		["References"] = MainGui:WaitForChild("References"),
 	};
 
+	PseudoTaskScheduler = {
+		Tasks = {};
+
+		PerformanceManager = {
+
+		},
+
+		Settings = {
+
+		},
+
+		Logger = {
+			OutputBuffer = {
+			},
+		},
+	};
+
 	ActivePage = nil,
 	TaskScheduler = nil,
 	Mode = 'client'
@@ -174,7 +191,7 @@ local Pages = {
 				if not TaskManager.TaskScheduler then return end;
 
 				local SelectedTask = this.Constants.SelectedTask;
-				local TaskData = TaskManager.TaskScheduler[SelectedTask];
+				local TaskData = TaskManager.TaskScheduler.Tasks[SelectedTask];
 				
 				if not TaskData then
 					this.Constants.SelectedTask = nil;
@@ -357,19 +374,19 @@ local Pages = {
 		Tab = TaskManager.GUI.TabContainer.Console,
 		Constants = {
 			LineCount = nil,
+			CONSOLE_MAX_LIMIT = nil,
 		},
 		Connections = {},
 
 		UpdateFunction = function(this)
 			local MaxLineCount = 12; -- A constraint of the console size limit
-			local CONSOLE_MAX_LIMIT = 500; -- The maximum amount of lines the console can hold
 			local ConsoleLineReference = TaskManager.GUI.References.ConsoleLineReference:Clone();
 
 			local function NewLine(LineText: string, OutputType: number?)
 				local ConsoleLine = ConsoleLineReference:Clone();
 				local TextSize = ConsoleLine.TextSize;
 				local OutputType = (OutputType and math.clamp(OutputType, 1, 3) or nil);
-				this.Constants.LineCount = math.min(this.Constants.LineCount + 1, CONSOLE_MAX_LIMIT);
+				this.Constants.LineCount = math.min(this.Constants.LineCount + 1, (this.Constants.CONSOLE_MAX_LIMIT or 500));
 				local CanvasSizeOffset = (this.Constants.LineCount > MaxLineCount and (TextSize * (this.Constants.LineCount - MaxLineCount)) or 0);
 
 				local LineContainer = this.Container.TextContainer;
@@ -399,8 +416,8 @@ local Pages = {
 				end;
 
 				-- Remove the first line if the console is over the limit
-				if this.Constants.LineCount >= CONSOLE_MAX_LIMIT then
-					local TopLineNumber = (this.Constants.LineCount - CONSOLE_MAX_LIMIT) + 1;
+				if this.Constants.LineCount >= this.Constants.CONSOLE_MAX_LIMIT then
+					local TopLineNumber = (this.Constants.LineCount - this.Constants.CONSOLE_MAX_LIMIT) + 1;
 
 					for _, ConsoleLine in next, LineContainer:GetChildren() do
 						if not ConsoleLine:IsA("TextLabel") then continue end;
@@ -440,6 +457,7 @@ local Pages = {
 			local function ClearConsole()
 				local function ResetLineCount()
 					this.Constants.LineCount = 0;
+					this.Constants.CONSOLE_MAX_LIMIT = 500;
 				end;
 
 				for _, ConsoleLine in next, this.Container.TextContainer:GetChildren() do
@@ -548,7 +566,7 @@ local Pages = {
 
 				Commands.echo = {
 					action = function(options)
-						local Text = options.text or "No text provided";
+						local Text = options.t or "No text provided";
 						DoConsoleOutput(Text);
 					end,
 					description = "Echo text to the console",
@@ -559,7 +577,7 @@ local Pages = {
 
 				Commands.tab = {
 					action = function(options)
-						local TabName = options.name or "No name provided";
+						local TabName = options.n or "No name provided";
 						local Tab = TaskManager.GUI.TabContainer:FindFirstChild(TabName);
 
 						if not Tab then
@@ -622,7 +640,7 @@ local Pages = {
 				Commands.clim = {
 					action = function(options)
 						local Limit = options.l and tonumber(options.l) or 500;
-						CONSOLE_MAX_LIMIT = Limit;
+						this.Constants.CONSOLE_MAX_LIMIT = Limit;
 
 						if not options.l then
 							return "The current console limit is " .. Limit;
@@ -636,10 +654,35 @@ local Pages = {
 					}
 				}
 
+				Commands.switch = {
+					action = function(options)
+						local NewMode = options.m;
+
+						if not NewMode then
+							return "No mode specified";
+						end;
+
+						if NewMode == TaskManager.Mode then
+							return "Already in mode " .. NewMode;
+						end;
+
+						if NewMode == 'client' or NewMode == 'server' then
+							TaskManager.Mode = NewMode;
+							return "Switched to mode " .. NewMode;
+						else
+							return "Invalid mode";
+						end;
+					end,
+					description = "Switch between client and server mode",
+					options = {
+						m = "The mode to switch to"
+					}
+				}
+
 				Commands.task = {
 					action = function(options)
 						local TaskName = options.n;
-						local Task = TaskManager.TaskScheduler[TaskName];
+						local Task = TaskManager.TaskScheduler.Tasks[TaskName];
 
 						if not Task then
 							return "Task not found";
@@ -692,7 +735,7 @@ local Pages = {
 					local Success, Result = pcall(CommandData.action, options);
 
 					if not Success then
-						error("An error occurred while processing the command\n" .. Result, 0);
+						error("ERROR:\n" .. Result, 0);
 					else
 						return Result;
 					end;
@@ -856,7 +899,7 @@ TaskManager.HookTabButtons = function(this)
 
 			-- Disconnect current page connections
 			for _, Connection in next, CurrentPageData.Connections do
-				Connection:Disconnect();
+				-- Connection:Disconnect();
 			end;
 
 			-- Reset current page constants
@@ -879,26 +922,49 @@ end;
 
 -- Create Pseudo-TaskScheduler (For serverside operations)
 TaskManager.CreatePseudoTaskScheduler = function()
-	return shared.TaskScheduler;
+	local TaskScheduler = {};
+	local TaskSchedulerMeta = {};
+	TaskSchedulerMeta.__index = function(_, Index)
+		if TaskManager.Mode == 'client' then
+			return shared.TaskScheduler[Index];
+		else
+			return TaskManager.PseudoTaskScheduler[Index];
+		end
+	end;
 
-	--[[
-		local TaskScheduler = {};
-		local TaskSchedulerMeta = {};
-		TaskSchedulerMeta.__index = function(_, Index)
-			if TaskManager.Mode == 'client' then
-				return shared.TaskScheduler[Index];
-			else
-				if Index == "PerformanceManager" then
-					-- Implement pseudo PerformanceManager
-				else
-					-- Implement server side call
-				end
-				return nil-- Return yieldable call from RemoteFunction
-			end
-		end;
+	return setmetatable(TaskScheduler, TaskSchedulerMeta);
+end;
 
-		return setmetatable(TaskScheduler, TaskSchedulerMeta);
-	]]
+TaskManager.FetchData = function(this)
+	local TaskSchedulerClientFunction = game.ReplicatedStorage:FindFirstChild("TaskSchedulerClientFunction");
+
+	local function SendMessage(Message: string, ...)
+		return TaskSchedulerClientFunction:InvokeServer(Message, ...);
+	end;
+
+	local RetriveData = function()
+		if TaskManager.Mode == 'client' then return end;
+
+		TaskManager.PseudoTaskScheduler.Tasks = SendMessage("GetTasks")
+		TaskManager.PseudoTaskScheduler.Logger.OutputBuffer = SendMessage("GetLogs")
+		TaskManager.PseudoTaskScheduler.Settings = SendMessage("GetSettings")
+		TaskManager.PseudoTaskScheduler.PerformanceManager.Tasks = SendMessage("PerformanceManager", "GetTasks")
+	end
+
+	TaskManager.PseudoTaskScheduler.PerformanceManager.GetTaskAverage = function(this, TaskName)
+		return SendMessage("PerformanceManager", "GetTaskAverage", TaskName)
+	end
+	TaskManager.PseudoTaskScheduler.PerformanceManager.GetTaskMaximum = function(this, TaskName)
+		return SendMessage("PerformanceManager", "GetTaskMaximum", TaskName)
+	end
+	TaskManager.PseudoTaskScheduler.PerformanceManager.GetDelayedExecutionCount = function(this, TaskName)
+		return SendMessage("PerformanceManager", "GetDelayedExecutionCount", TaskName)
+	end
+	TaskManager.PseudoTaskScheduler.PerformanceManager.GetActiveTasks = function(this)
+		return SendMessage("PerformanceManager", "GetActiveTasks")
+	end
+
+	return RetriveData;
 end;
 
 -- Initialize
@@ -915,6 +981,16 @@ TaskManager.Initialize = function(this)
 	this.ActivePage = "TaskList";
 	
 	this:HookTabButtons();
+
+	-- Regular fetches to update PerformanceManager Tasks
+	local FetchDataMethod = this:FetchData();
+
+	TaskManager.TaskScheduler:ScheduleTask({
+		TaskName = "FetchData",
+		TaskAction = FetchDataMethod,
+		IsRecurringTask = true,
+		TaskExecutionDelay = 0,
+	})
 	return this;
 end;
 
