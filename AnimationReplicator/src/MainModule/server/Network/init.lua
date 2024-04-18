@@ -1,0 +1,152 @@
+-- @Author: iKrypto
+
+-- Setting up service provider
+local Services = setmetatable({}, {__index=function(self, index)return game:GetService(index); end;})
+
+local Remote = {};
+
+local Players = Services.Players;
+local ReplicatedStorage = Services.ReplicatedStorage;
+
+local Signal = require(script.Signal)
+local Signals = {};
+
+-- Config
+local queueEnabled = false; -- No RemoteEvent Queueing.
+
+local RemoteEvent = nil;
+local PlayerInfo = {};
+
+local function updateValidator(n) return (n*1582831 + 19582923) % (2^32) end
+local function publicValidator(n) return (n-n%12424)/12424 end
+
+function Remote:Fire(player, RemoteName, ...)
+	local info = PlayerInfo[player]
+	if not info then return end
+	if (queueEnabled and (not info.Enabled)) then info.Queue[#info.Queue+1] = {len=select("#",...), ...} return end
+
+	local id = publicValidator(info.SendId); info.SendId = updateValidator(info.SendId)
+	local id2 = publicValidator(info.SendId); info.SendId = updateValidator(info.SendId)
+	RemoteEvent:FireClient(player, id, id2, RemoteName, ...)
+end
+
+function Remote:FireAllClients(RemoteName, ...)
+	for _, Player in ipairs(Players:GetPlayers()) do
+		self:Fire(Player, RemoteName, ...)
+	end
+end
+
+function Remote:listen(cmd, fn)
+	if type(cmd) ~= "string" or type(fn) ~= "function" then return end;
+	if not Signals[cmd] then Signals[cmd] = Signal.new() end;
+	return Signals[cmd]:connect(fn);
+end;
+
+local function receiveCallback(Player, id, id2, RemoteName, ...)
+	local info = PlayerInfo[Player];
+	if not info then return end;
+	if not info.Enabled then
+		if id == "AuthRequest" and type(id2) == "number" and type(RemoteName) == "number" then
+			if publicValidator(id2) == RemoteName then
+				info.SendId = updateValidator(id2);
+				info.RecvId = math.random(0, 2^30);
+				local response = {Player, "AuthResponse", publicValidator(info.SendId), info.RecvId};
+
+				info.SendId = updateValidator(info.SendId);
+				info.RecvId = updateValidator(info.RecvId);
+				info.Enabled = true;
+
+				RemoteEvent:FireClient(unpack(response));
+
+				local queue = info.Queue;
+				info.Queue = {};
+				for i,v in pairs(queue) do
+					Remote:Fire(Player, unpack(v, 1, v.len));
+				end;
+			end;
+		end;
+		return;
+	end;
+	if type(id) ~= "number" or type(id2) ~= "number" or type(RemoteName) ~= "string" then return end;
+	if id ~= publicValidator(info.RecvId) or id2 ~= publicValidator(updateValidator(info.RecvId)) then return end;
+	info.RecvId = updateValidator(updateValidator(info.RecvId));
+
+	if Signals[RemoteName] then
+		Signals[RemoteName]:Fire(Player, ...);
+	else
+		warn("No listener set for ", RemoteName)
+	end;
+end;
+
+
+do
+	local function playerAdd(player)
+		local info;
+
+		info = {
+			Player = player,
+			Queue = {},
+			Enabled = false,
+			SendId = 0,
+			RecvId = 0,
+			playerConnect = player.CharacterAdded:connect(function()
+				--info.Enabled = false;
+			end)
+		}
+
+		PlayerInfo[player] = info
+	end
+
+	local function playerRem(player)
+		pcall(function() PlayerInfo[player].playerConnect:disconnect() end)
+		PlayerInfo[player] = nil
+	end
+
+	for i,v in pairs(Players:GetPlayers()) do playerAdd(v) end
+	Players.PlayerAdded:connect(playerAdd)
+	Players.PlayerRemoving:connect(playerRem)
+end
+
+do		
+	local function makeEvent()
+		for i,v in pairs(PlayerInfo) do
+			v.Enabled = false
+		end
+		RemoteEvent = Instance.new("RemoteEvent")
+		RemoteEvent.Name = "WeaponReplicator"
+		RemoteEvent.OnServerEvent:Connect(receiveCallback)
+		RemoteEvent.Changed:Connect(function(prop)
+			if prop == "Name" and RemoteEvent.Name ~= "WeaponReplicator" then
+				RemoteEvent:Destroy()
+			end
+		end)
+		RemoteEvent.Parent = ReplicatedStorage
+	end
+
+	local function checkChild(child)
+		if child == RemoteEvent or not child:IsA("RemoteEvent") then return end
+		if child.Name == "WeaponReplicator" then child:Destroy() return end
+		local chCon = nil
+
+		chCon = child.Changed:Connect(function(prop)
+			if prop == "Parent" then
+				chCon:Disconnect()
+			elseif prop == "Name" and child.Name == "WeaponReplicator" then
+				chCon:Disconnect()
+				child:Destroy()
+			end
+		end)
+	end
+
+	for i,v in pairs(ReplicatedStorage:GetChildren()) do checkChild(v) end
+	ReplicatedStorage.ChildAdded:connect(checkChild)
+	ReplicatedStorage.ChildRemoved:connect(function(child)
+		if child ~= RemoteEvent then return end
+		RemoteEvent:Destroy()
+		RemoteEvent = nil
+		spawn(makeEvent)
+	end)
+	spawn(makeEvent)
+end
+
+return Remote

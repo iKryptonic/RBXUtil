@@ -743,6 +743,11 @@ local Pages = {
 			end
 
 			local function HookUserInput()
+				-- Disconnect all connections
+				for _, Connection in next, this.Connections do
+					Connection:Disconnect();
+				end;
+
 				local UserInput = this.Container.UserInput;
 				local UserInputConnection;
 
