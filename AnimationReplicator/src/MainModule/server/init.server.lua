@@ -14,17 +14,17 @@ local ReplicatedStorage = Services.ReplicatedStorage
 local CollectionS		= Services.CollectionService
 
 -- Assets
-local AssetData	= script:WaitForChild("AssetData", 10)
-local Replicator= script:WaitForChild("Replicator", 10)
-local Network	= require(script.Network);
-local Player	= require(script.Player)
+local AssetData			= script:WaitForChild("AssetData", 10)
+local ReplicatorLoader	= script:WaitForChild("ReplicatorLoader", 10)
+local Network			= require(script.Network);
+local Player			= require(script.Player)
 
 -- Indexing players for inventory handling
 local PlayerData = {};
 
 -- Create Folder for assets
 local Assets; do 
-	
+
 	local AssetConnection = nil;
 	local function CheckFolder()
 		local Folder = ReplicatedStorage:FindFirstChild("Assets")
@@ -32,40 +32,38 @@ local Assets; do
 			Folder = Instance.new("Folder", ReplicatedStorage)
 			Folder.Name = "Assets"
 		end
-		
+
 		for _, Object in ipairs(AssetData:GetChildren()) do
 			Object:Clone().Parent = Folder
 		end
-		
-	return Folder
+
+		return Folder
 	end
-	
+
 	Assets = CheckFolder()
-	
+
 	AssetConnection = Assets.AncestryChanged:connect(function()
 		Assets = CheckFolder();
 		AssetConnection:disconnect();
 	end)
-	
+
 end
 
 -------------------------- functions --------------------------------
 
 local function loadScript(Player)
-	local LS = Replicator:Clone();
+	local LS = ReplicatorLoader:Clone();
 	wait();
-	LS.Parent = Player.PlayerGui;
+	LS.Parent = Player.Character;
 	LS.Disabled = false;
 end
 
 -- Essentially, this is playerAdded.
 local function indexPlayer(P)
-	repeat wait() warn("No Character Found") until (P and P.Character)
+	repeat wait() until (P and P.Character)
 	loadScript(P);
-	
-	print("Loaded Localscript for ", P.Name)
+
 	PlayerData[P] = Player.new(P);
-	print("Created Player for ", P.Name)
 end
 
 local function removePlayer(Player)
@@ -90,7 +88,7 @@ for _, p in ipairs(Players:GetPlayers()) do indexPlayer(p) end;
 -- Internal showtext stuff
 local ShowText; do 
 	ShowText =  function(Pos, Text, Time, Color)
-		
+
 		local function Create(Ins)
 			return function(Table)
 				local Object = Instance.new(Ins)
@@ -100,7 +98,7 @@ local ShowText; do
 				return Object
 			end
 		end
-		
+
 		local Rate = (1 / 30)
 		local Pos = (Pos or Vector3.new(0, 0, 0))
 		local Text = (Text or "")
@@ -163,11 +161,11 @@ Network:listen('Damage', function(Origin, Victim, Damage, AttackName)
 	Damage = math.clamp(Damage, 3, 110)
 	local Part = Victim.Head
 	ShowText((Part.CFrame * CFrame.new(0, 0, (Part.Size.Z / 2)).Position + Vector3.new(math.random(-5,5), 1.5, 0)), tostring(Damage), 1.5, BrickColor.new('Bright red').Color)
-	
+
 	local VictimPlayer = Services.Players:GetPlayerFromCharacter(Victim);
-	
+
 	Victim.Humanoid:TakeDamage(Damage);
-	
+
 	if VictimPlayer then
 		Network:Fire(VictimPlayer, 'OnHit')
 	end;

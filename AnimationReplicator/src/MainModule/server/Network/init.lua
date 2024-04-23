@@ -17,17 +17,12 @@ local queueEnabled = false; -- No RemoteEvent Queueing.
 local RemoteEvent = nil;
 local PlayerInfo = {};
 
-local function updateValidator(n) return (n*1582831 + 19582923) % (2^32) end
-local function publicValidator(n) return (n-n%12424)/12424 end
-
 function Remote:Fire(player, RemoteName, ...)
 	local info = PlayerInfo[player]
 	if not info then return end
 	if (queueEnabled and (not info.Enabled)) then info.Queue[#info.Queue+1] = {len=select("#",...), ...} return end
 
-	local id = publicValidator(info.SendId); info.SendId = updateValidator(info.SendId)
-	local id2 = publicValidator(info.SendId); info.SendId = updateValidator(info.SendId)
-	RemoteEvent:FireClient(player, id, id2, RemoteName, ...)
+	RemoteEvent:FireClient(player, RemoteName, ...)
 end
 
 function Remote:FireAllClients(RemoteName, ...)
@@ -42,34 +37,19 @@ function Remote:listen(cmd, fn)
 	return Signals[cmd]:connect(fn);
 end;
 
-local function receiveCallback(Player, id, id2, RemoteName, ...)
+local function receiveCallback(Player, RemoteName, ...)
 	local info = PlayerInfo[Player];
 	if not info then return end;
 	if not info.Enabled then
-		if id == "AuthRequest" and type(id2) == "number" and type(RemoteName) == "number" then
-			if publicValidator(id2) == RemoteName then
-				info.SendId = updateValidator(id2);
-				info.RecvId = math.random(0, 2^30);
-				local response = {Player, "AuthResponse", publicValidator(info.SendId), info.RecvId};
+		info.Enabled = true;
 
-				info.SendId = updateValidator(info.SendId);
-				info.RecvId = updateValidator(info.RecvId);
-				info.Enabled = true;
-
-				RemoteEvent:FireClient(unpack(response));
-
-				local queue = info.Queue;
-				info.Queue = {};
-				for i,v in pairs(queue) do
-					Remote:Fire(Player, unpack(v, 1, v.len));
-				end;
-			end;
+		local queue = info.Queue;
+		info.Queue = {};
+		for i,v in pairs(queue) do
+			Remote:Fire(Player, unpack(v, 1, v.len));
 		end;
 		return;
 	end;
-	if type(id) ~= "number" or type(id2) ~= "number" or type(RemoteName) ~= "string" then return end;
-	if id ~= publicValidator(info.RecvId) or id2 ~= publicValidator(updateValidator(info.RecvId)) then return end;
-	info.RecvId = updateValidator(updateValidator(info.RecvId));
 
 	if Signals[RemoteName] then
 		Signals[RemoteName]:Fire(Player, ...);
@@ -87,8 +67,6 @@ do
 			Player = player,
 			Queue = {},
 			Enabled = false,
-			SendId = 0,
-			RecvId = 0,
 			playerConnect = player.CharacterAdded:connect(function()
 				--info.Enabled = false;
 			end)

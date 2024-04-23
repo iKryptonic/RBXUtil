@@ -1631,8 +1631,6 @@ end)
 Util.Schedule(function()
 	Network:FireEvent("UpdateData")
 end, 1, true) -- Set a recurring scheduled function to get server data
-
-print("loaded")
 --[[
 Util.Schedule(function()
 	Replicator:FireEvent("Animation", "LoadAnimationSetFromTable", require(Animations))

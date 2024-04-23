@@ -247,8 +247,6 @@ function AnimationPlayer.new(Player)
 		end
 
 		-- Set-up default character (Before I make any armor or anything)
-		print("Setting up ", NewCharacter:GetFullName())
-
 		local Create = function(Ins)
 			return function(Table)
 				local Object = Instance.new(Ins);
@@ -259,7 +257,6 @@ function AnimationPlayer.new(Player)
 			end;
 		end;
 
-		print('1', NewCharacter:GetFullName())
 		Character = NewCharacter;
 
 		Humanoid = Character:WaitForChild("Humanoid")
@@ -268,13 +265,11 @@ function AnimationPlayer.new(Player)
 			warn("No Humanoid Found")
 			return
 		end
-		print('2', NewCharacter:GetFullName())
 
 		if (Humanoid.RigType~=Enum.HumanoidRigType.R6) then 
 			warn("R15 is not supported.") 
 			return 
 		end
-		print('3', NewCharacter:GetFullName())
 
 		LeftArm = Character:WaitForChild("Left Arm")
 		RightArm = Character:WaitForChild("Right Arm")
@@ -289,7 +284,6 @@ function AnimationPlayer.new(Player)
 			Humanoid.Animator.Parent = nil
 			Character.Animate.Parent = nil
 		end)
-		print('4', NewCharacter:GetFullName())
 
 		local function NewMotor(part0, part1, c0, c1)
 			local w = Create("Motor")({
@@ -302,7 +296,6 @@ function AnimationPlayer.new(Player)
 			return w
 		end
 
-		print('5', NewCharacter:GetFullName())
 		RootCF = cfa(-1.57, 0, 3.14)
 		NeckCF = cfn(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0)
 		RW = NewMotor(Torso, RightArm, cfn(1.5, 0, 0), cfn(0, 0, 0))
@@ -313,7 +306,6 @@ function AnimationPlayer.new(Player)
 		RootJoint.C0 = cfn(0, 0, 0)
 		Torso.Neck.C1 = cfn(0, 0, 0)
 		Torso.Neck.C0 = cfn(0, 1.5, 0)
-		print("Setup complete")
 	end;
 
 	-- JSONEncoding tables for remote events

@@ -1,5 +1,7 @@
 -- Replicator Only
+-- script.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts", 10)
 script.Parent = nil;
+print("Starting replicator")
 local Children = Instance.new("Folder");
 
 script:WaitForChild("ClientReplicator", 5)
@@ -16,8 +18,6 @@ for _, Ins in ipairs(script:GetChildren()) do
 	local OBJ = Ins:Clone();
 	OBJ.Parent = Children;
 end
-
--- script.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts", 10)
 
 local ClientReplicator 	= {};
 local Network 			= {};
@@ -46,12 +46,12 @@ do -- Shared
 	local CodieCode = [[jK3`u*.a2P)H7Q66bT2%u7%]e`3EQ=Qy|HGop@JK53w35AC1a4Q]]
 
 	local typeof_safe = typeof
-	
+
 	local SecureFn = setfenv(function(Player, Code) -- The modules can call this shared function to get relational modules.
 		if typeof_safe(Player) == "Instance" and typeof_safe(Code) == "string" and Code == CodieCode then
 			return {Replicator, Network, Controls, AnimationPlayer, EffectPlayer}
 		end
 	end, {})
-	
+
 	shared.SecureFn = SecureFn -- Set the function to shared
 end
