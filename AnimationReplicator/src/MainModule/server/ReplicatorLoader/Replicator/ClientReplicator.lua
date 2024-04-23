@@ -136,7 +136,7 @@ function ClientReplicator.new()
 		if(getState()~=1) then error("This object is not running.", 0)  return end;
 		-- Create animation player for every player that joins
 		local Animation 	= AnimationPlayer.new(Player);
-		wait()
+		task.wait()
 		-- Begin the animation replication to be rendered by the client.
 		Animation:Initialize() -- no more setup yielding
 		AnimationPlayers[Player.userId] = Animation;
@@ -168,7 +168,7 @@ function ClientReplicator.new()
 	rawset(Methods, 'encode', Encode)
 	-- End Alias setting
 
-	local function handleEvent(Animatee, Type, ...)
+	local function HandleEvent(Animatee, Type, ...)
 		local args = table.pack(...);
 		if (Type and (Callbacks[Type]~=nil)) then
 			if Type=='Animation' then
@@ -198,9 +198,9 @@ function ClientReplicator.new()
 					Sound.Pitch = Pitch
 					Sound.Volume = Volume
 					Sound.PlayOnRemove = OnRemove
-					wait()
+					task.wait()
 					Sound.Parent = Parent;
-					wait()
+					task.wait()
 					Sound:Play();
 
 					if OnRemove then
@@ -210,7 +210,7 @@ function ClientReplicator.new()
 					end
 
 					coroutine.wrap(function()
-						repeat wait() until (not Sound.IsPlaying)
+						repeat task.wait() until (not Sound.IsPlaying)
 						Services.Debris:AddItem(Sound);
 					end)()
 
@@ -221,7 +221,7 @@ function ClientReplicator.new()
 
 	local function FireEvent(self, Type, Callback, ...)
 		Network:FireEvent('Replicate', Type, Callback, ...)
-		handleEvent(Owner, Type, Callback, ...)
+		HandleEvent(Owner, Type, Callback, ...)
 	end
 
 	-- Alias setting
@@ -231,7 +231,7 @@ function ClientReplicator.new()
 
 	local function StartListener()
 
-		rawset(Properties, 'Connection', Network:listen("Replicate", handleEvent)) -- Sets connection to RBXScriptSignal
+		rawset(Properties, 'Connection', Network:Listen("Replicate", HandleEvent)) -- Sets connection to RBXScriptSignal
 		Effects:Initialize();
 
 		rawset(Properties, 'Status', 'running')

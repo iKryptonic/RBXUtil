@@ -17,12 +17,15 @@ local queueEnabled = false; -- No RemoteEvent Queueing.
 local RemoteEvent = nil;
 local PlayerInfo = {};
 
-function Remote:Fire(player, RemoteName, ...)
-	local info = PlayerInfo[player]
+function Remote:Fire(TargetPlayer, RemoteName, ...)
+	local info = PlayerInfo[TargetPlayer]
 	if not info then return end
-	if (queueEnabled and (not info.Enabled)) then info.Queue[#info.Queue+1] = {len=select("#",...), ...} return end
+	if (queueEnabled and (not info.Enabled)) then 
+		info.Queue[#info.Queue+1] = {len=select("#",...), ...} 
+	return 
+	end
 
-	RemoteEvent:FireClient(player, RemoteName, ...)
+	RemoteEvent:FireClient(TargetPlayer, RemoteName, ...)
 end
 
 function Remote:FireAllClients(RemoteName, ...)
@@ -31,13 +34,16 @@ function Remote:FireAllClients(RemoteName, ...)
 	end
 end
 
-function Remote:listen(cmd, fn)
-	if type(cmd) ~= "string" or type(fn) ~= "function" then return end;
-	if not Signals[cmd] then Signals[cmd] = Signal.new() end;
-	return Signals[cmd]:connect(fn);
+function Remote:Listen(Command, ExecuteFunction)
+	if type(Command) ~= "string" or type(ExecuteFunction) ~= "function" then return end;
+	if not Signals[Command] then 
+		Signals[Command] = Signal.new() 
+	end;
+
+	return Signals[Command]:connect(ExecuteFunction);
 end;
 
-local function receiveCallback(Player, RemoteName, ...)
+local function ReceiveCallback(Player, RemoteName, ...)
 	local info = PlayerInfo[Player];
 	if not info then return end;
 	if not info.Enabled then
@@ -60,7 +66,7 @@ end;
 
 
 do
-	local function playerAdd(player)
+	local function PlayerAdded(player)
 		local info;
 
 		info = {
@@ -75,24 +81,24 @@ do
 		PlayerInfo[player] = info
 	end
 
-	local function playerRem(player)
+	local function PlayerRemoving(player)
 		pcall(function() PlayerInfo[player].playerConnect:disconnect() end)
 		PlayerInfo[player] = nil
 	end
 
-	for i,v in pairs(Players:GetPlayers()) do playerAdd(v) end
-	Players.PlayerAdded:connect(playerAdd)
-	Players.PlayerRemoving:connect(playerRem)
+	for i,v in pairs(Players:GetPlayers()) do PlayerAdded(v) end
+	Players.PlayerAdded:connect(PlayerAdded)
+	Players.PlayerRemoving:connect(PlayerRemoving)
 end
 
 do		
-	local function makeEvent()
+	local function CreateRemoteEvent()
 		for i,v in pairs(PlayerInfo) do
 			v.Enabled = false
 		end
 		RemoteEvent = Instance.new("RemoteEvent")
 		RemoteEvent.Name = "WeaponReplicator"
-		RemoteEvent.OnServerEvent:Connect(receiveCallback)
+		RemoteEvent.OnServerEvent:Connect(ReceiveCallback)
 		RemoteEvent.Changed:Connect(function(prop)
 			if prop == "Name" and RemoteEvent.Name ~= "WeaponReplicator" then
 				RemoteEvent:Destroy()
@@ -101,30 +107,30 @@ do
 		RemoteEvent.Parent = ReplicatedStorage
 	end
 
-	local function checkChild(child)
-		if child == RemoteEvent or not child:IsA("RemoteEvent") then return end
-		if child.Name == "WeaponReplicator" then child:Destroy() return end
-		local chCon = nil
+	local function CheckChild(Child)
+		if Child == RemoteEvent or not Child:IsA("RemoteEvent") then return end
+		if Child.Name == "WeaponReplicator" then Child:Destroy() return end
+		local ChangedConnection = nil
 
-		chCon = child.Changed:Connect(function(prop)
-			if prop == "Parent" then
-				chCon:Disconnect()
-			elseif prop == "Name" and child.Name == "WeaponReplicator" then
-				chCon:Disconnect()
-				child:Destroy()
+		ChangedConnection = Child.Changed:Connect(function(ChangedProperty)
+			if ChangedProperty == "Parent" then
+				ChangedConnection:Disconnect()
+			elseif ChangedProperty == "Name" and Child.Name == "WeaponReplicator" then
+				ChangedConnection:Disconnect()
+				ChangedConnection:Destroy()
 			end
 		end)
 	end
 
-	for i,v in pairs(ReplicatedStorage:GetChildren()) do checkChild(v) end
-	ReplicatedStorage.ChildAdded:connect(checkChild)
-	ReplicatedStorage.ChildRemoved:connect(function(child)
-		if child ~= RemoteEvent then return end
+	for i,v in pairs(ReplicatedStorage:GetChildren()) do CheckChild(v) end
+	ReplicatedStorage.ChildAdded:connect(CheckChild)
+	ReplicatedStorage.ChildRemoved:connect(function(RemovedChild)
+		if RemovedChild ~= RemoteEvent then return end
 		RemoteEvent:Destroy()
 		RemoteEvent = nil
-		spawn(makeEvent)
+		task.spawn(CreateRemoteEvent)
 	end)
-	spawn(makeEvent)
+	task.spawn(CreateRemoteEvent)
 end
 
 return Remote

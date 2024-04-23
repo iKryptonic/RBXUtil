@@ -63,7 +63,7 @@ Init.Name = 'CreateAnimator'
 Init.Parent = workspace:findFirstChild("]]..Services.Players.LocalPlayer.Name..[[")
 ]], workspace)--]==]
 
-wait(1.5)
+task.wait(1.5)
 
 -- Key Bindings
 local KeyStrokeKey 	= keyCodes.C; -- The key to be used with keystrokes
@@ -203,7 +203,7 @@ local MainLoop;
 
 -- Stepped Wait
 local SWait = function()
-	return Services.RunService.Stepped:wait();
+	return task.wait(); --Services.RunService.Stepped:wait();
 end
 
 -------------------------------- Character Movers -------------------------------------
@@ -278,7 +278,7 @@ do
 	-- Camera Shaking
 	local ShakeCam = function(Intensity, waitingTime)
 		Camera.CFrame = Camera.CFrame * CF(0, (Intensity or 2), 0)
-		wait(waitingTime or 1/30)
+		task.wait(waitingTime or 1/30)
 		Camera.CFrame = Camera.CFrame * CF(0, (Intensity and -Intensity or -2), 0)
 	end
 
@@ -410,7 +410,7 @@ do
 		local StanceGyro = CharacterMovers.get("StanceGyro")
 		StanceGyro.cframe = CF(RootPart.Position, RootPart.Position + CharacterPlane() * 5)
 
-		wait(Duration)
+		task.wait(Duration)
 		DesiredWalkSpeed = 16;
 		Debounces.Stunned = false;
 		Debounces.MouseLocked = true;
@@ -449,7 +449,7 @@ do
 		end;
 
 		if (DelayNext) then
-			wait(DelayNext)
+			task.wait(DelayNext)
 		end
 
 		Debounces.CanAnimate = true;
@@ -1049,7 +1049,7 @@ do
 									local StanceGyro = CharacterMovers.Get("StanceGyro");
 									local Up = RootPart.CFrame.UpVector;
 
-									spawn(function()
+									task.spawn(function()
 										Util.playCustomTrack("FrontFlip", 0.1, 0.15, function() RootPart.Velocity = Up * 35 end)
 									end)
 
@@ -1060,7 +1060,7 @@ do
 									StanceGyro.P = 99960
 									for i = 0, 360, 30 do
 										StanceGyro.CFrame = StanceGyro.CFrame * CFrame.Angles(-MR(30), 0, 0)
-										wait()
+										task.wait()
 									end
 									StanceGyro.Parent = RootPart;
 									StanceGyro.P = 10000
@@ -1160,7 +1160,7 @@ do
 	
 	-- Connect to collectionservice
 	for CallbackName, CallbackFunction in pairs(Callbacks) do
-		Network:listen(CallbackName, CallbackFunction)
+		Network:Listen(CallbackName, CallbackFunction)
 	end -- Disconnect these when the client ends.
 end
 
@@ -1251,8 +1251,8 @@ do
 		Replicator:FireEvent("Effect", "Lightning", SPos1, SPos2, 4, 2, 'New Yeller', 0.15, 0.4, 0.05)
 	end
 
-	spawn(function()
-		while wait(MRand()) do
+	task.spawn(function()
+		while task.wait(MRand()) do
 			emitLightning()
 		end
 	end)
@@ -1624,7 +1624,7 @@ end
 Input.Connect();
 Services.RunService.Heartbeat:connect(MainLoop);
 
-Network:listen('UpdateData', function(Data)
+Network:Listen('UpdateData', function(Data)
 	PlayerData = Data;
 end)
 

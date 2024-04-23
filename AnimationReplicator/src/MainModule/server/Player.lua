@@ -18,7 +18,7 @@ local ReplicatedStorage = Services.ReplicatedStorage;
 local Player = {};
 
 
-local function new(Player)
+function Player.new(TargetPlayer)
 	
 	local API = {};
 	
@@ -26,8 +26,8 @@ local function new(Player)
 	
 	local PlayerData = {
 		Inventory 	= {"1", "2", "3", "4", "5", "6", "7"};
-		Player 		= Player;
-		UserId 		= Player.userId;
+		Player 		= TargetPlayer;
+		UserId 		= TargetPlayer.userId;
 		Equipped 	= {};
 		ActionBar 	= {};
 		WeaponEqp	= '1';
@@ -44,16 +44,14 @@ local function new(Player)
 	end
 	
 	local function CheckStowContainer()
-		if Player then
-			if Player.Character then
-				local Cont = Player.Character:FindFirstChild('StowContainer')
-				if (not Cont) then
-					local Cont = Instance.new("Model")
-					Cont.Name = 'StowContainer'
-					Cont.Parent = Player.Character
-				end
-				return Cont
+		if TargetPlayer and TargetPlayer.Character then
+			local Cont = TargetPlayer.Character:FindFirstChild('StowContainer')
+			if (not Cont) then
+				Cont = Instance.new("Model")
+				Cont.Name = 'StowContainer'
+				Cont.Parent = TargetPlayer.Character
 			end
+			return Cont
 		end
 	end
 	
@@ -96,10 +94,10 @@ local function new(Player)
 					HandleWeld.Part1 = Handle
 					HandleWeld.Name = 'HandleWeld'
 					HandleWeld.C1 = Data.GripC1
-					wait()
+					task.wait()
 					HandleWeld.Parent = Handle
 					Item.Parent = Hand
-					Network:FireAllClients('ChangeEquip', Player, 'Equip', Hand, Item, HandleWeld);
+					Network:FireAllClients('ChangeEquip', TargetPlayer, 'Equip', Hand, Item, HandleWeld);
 					return true
 				else
 					error(("Weapon [%s] did not have a handle!"):format(ItemId), 0)
@@ -131,7 +129,7 @@ local function new(Player)
 			local Data = require(Item.Data);
 			local StowContainer = CheckStowContainer();
 			
-			Network:FireAllClients('ChangeEquip', Player, 'UnEquip', Hand);
+			Network:FireAllClients('ChangeEquip', TargetPlayer, 'UnEquip', Hand);
 			
 			if (Data.Stowable) then
 				local WeldParent = Item.Parent.Parent:FindFirstChild(Data.StowPartName)
@@ -162,7 +160,7 @@ local function new(Player)
 		local Item = ReplicatedStorage:FindFirstChild(ItemId, true)
 		
 		if Item or BypassCheck then
-			table.add(PlayerData.Inventory, ItemId)
+			table.insert(PlayerData.Inventory, ItemId)
 		end
 	end
 	
@@ -205,15 +203,13 @@ local function new(Player)
 	API.PlayerData			= PlayerData;
 	API.Data				= PlayerData;
 	API.data				= PlayerData;
-	API.Name				= Player.Name;
-	API.name				= Player.Name;
-	API.Player				= Player;
-	API.player				= Player;
+	API.Name				= TargetPlayer.Name;
+	API.name				= TargetPlayer.Name;
+	API.Player				= TargetPlayer;
+	API.player				= TargetPlayer;
 	API.Save				= Save;
 
 	return API
 end
 
-
-Player.new = new;
 return Player

@@ -26,16 +26,16 @@ local EffectPlayer		= {};
 local AnimationPlayer	= {}
 local Replicator 		= nil;
 
-spawn(function() AnimationPlayer = require(Children.AnimationPlayer) end)
-spawn(function() EffectPlayer = require(Children.EffectPlayer) end)
-spawn(function() Network = require(Children.Network) end)
-spawn(function() Controls = {
+task.spawn(function() AnimationPlayer = require(Children.AnimationPlayer) end)
+task.spawn(function() EffectPlayer = require(Children.EffectPlayer) end)
+task.spawn(function() Network = require(Children.Network) end)
+task.spawn(function() Controls = {
 	Gamepad=require(Children.Gamepad), 
 	Mobile=require(Children.Mobile),
 	Keyboard=require(Children.Keyboard), 
 	require(Children.Mouse)}
 end)
-spawn(function()
+task.spawn(function()
 	ClientReplicator 	= require(Children.ClientReplicator);
 	Replicator 			= ClientReplicator.new(); -- The replicator object that sends effect/animation data
 

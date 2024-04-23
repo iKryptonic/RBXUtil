@@ -94,7 +94,6 @@ API:
 repeat wait() until (shared.SecureFn~=nil)
 
 local AnimationPlayer = {};
-local Animations = {};
 
 -- Setting up service provider
 local Services = setmetatable({}, {__index=function(self, index)return game:GetService(index); end;})
@@ -171,7 +170,7 @@ function AnimationPlayer.new(Player)
 
 	-- Setting up Getter Methods
 	-- Returns the object's current state
-	local function getState()
+	local function GetState()
 		local States = {
 			["stopped"] = 0; -- stopped: 	Not initialized
 			["running"] = 1; -- running: 	Currently animating a character
@@ -231,12 +230,12 @@ function AnimationPlayer.new(Player)
 
 	-- Returns the current playing animation
 	local function GetPlayingTrack()
-		return {CurrentAnimation, CurrentTrack.priority};
+		return {CurrentAnimation, CurrentTrack.Priority};
 	end
 
 	-- Sets functions variables according to a pre-made character
 	local function SetUp(NewCharacter)
-		if (getState()==-1) then error("This object has ended.", 0) return end
+		if (GetState()==-1) then error("This object has ended.", 0) return end
 		if (not NewCharacter:findFirstChild("CreateAnimator")) then
 			repeat wait() until (NewCharacter:findFirstChild'CreateAnimator' or (not NewCharacter.Parent))
 		end
@@ -320,7 +319,7 @@ function AnimationPlayer.new(Player)
 	-- Internal function
 	-- Used for playing animations to the character from a reference table
 	local function PlayAnimationFromTable(ReferenceTable, Speed, Modifier)
-		if (getState()==-1) then error("This object has ended.", 0) return end
+		if (GetState()==-1) then error("This object has ended.", 0) return end
 		if (not Humanoid) or (Humanoid.Health <= 0) then return end
 
 		-- Negligible delay with this method
@@ -346,7 +345,7 @@ function AnimationPlayer.new(Player)
 
 	-- Batch loading animation profiles
 	local function LoadAnimationSetFromTable(self, AnimationTable)
-		if (getState()==-1) then error("This object has ended.", 0) return end
+		if (GetState()==-1) then error("This object has ended.", 0) return end
 		if typeof(AnimationTable)=="string" then AnimationTable = Decode(self, AnimationTable) end
 		-- Type checking
 		assert(typeof(AnimationTable)=="table", ("bad argument #1 to 'AnimationStructure' (table expected, got %s)"):format(typeof(AnimationTable)))
@@ -365,7 +364,7 @@ function AnimationPlayer.new(Player)
 
 	-- Play a Custom Animation
 	local function PlayAnimationCustom(self, AnimationName, Speed)
-		if (getState()==-1) then error("This object has ended.", 0) return end
+		if (GetState()==-1) then error("This object has ended.", 0) return end
 		if AnimationsInternal[AnimationName] then
 			local AnimationTrack = AnimationsInternal[AnimationName];
 
@@ -415,16 +414,16 @@ function AnimationPlayer.new(Player)
 	-- End Alias setting
 
 	local function Initialize(self)
-		if getState()~=0 then error("This object has already been initialized!", 0) return end
+		if GetState()~=0 then error("This object has already been initialized!", 0) return end
 
 		repeat wait() until Player.Character
 
 		rawset(Properties, 'Status', 'running')
 		SetUp(Player.Character)
-		SetUpConnection = Player.CharacterAdded:connect(SetUp)
+		SetUpConnection = Player.CharacterAdded:Connect(SetUp)
 
 		-------------------------------- NETWORK LISTENER ------------------------------
-		Network:listen('ChangeEquip', function(Origin, EquipStatus, Arm, Item, HandleWeld)
+		Network:Listen('ChangeEquip', function(Origin, EquipStatus, Arm, Item, HandleWeld)
 			if Origin==Player then
 				if Arm.Name=='Right Arm' then
 					if EquipStatus=='UnEquip' then
@@ -452,7 +451,7 @@ function AnimationPlayer.new(Player)
 			local i = 0;
 
 			while waitEvent:wait() do
-				if (getState()==-1) then break end;
+				if (GetState()==-1) then break end;
 				i=(i+.03);
 				rawset(Properties, 'Iterator', i);
 			end;

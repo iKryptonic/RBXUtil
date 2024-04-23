@@ -1,4 +1,4 @@
--- Remote Event Security funcz
+-- Remote Event handling
 
 -- Service Provider
 local Services	= setmetatable({}, {__index=function(self, index)return game:GetService(index); end;}); -- Setting up service provider
@@ -83,24 +83,24 @@ local function HandleEvent(RemoteEventName, ...)
 	end;
 end;
 
--- Remote:listen returns RBXScriptSignal
+-- Remote:Listen returns RBXScriptSignal
 
 do
 	local lastRemote = nil;
 
-	local function checkChild(child)
-		if not child:IsA("RemoteEvent") or child.Name ~= "WeaponReplicator" then return end;
-		lastRemote = child;
+	local function CheckChild(Child)
+		if not Child:IsA("RemoteEvent") or Child.Name ~= "WeaponReplicator" then return end;
+		lastRemote = Child;
 		if Remote then
 			Remote = nil;
 			Enabled = false;
 		end
 
-		if lastRemote ~= child or child.Parent ~= ReplicatedStorage then return end;
-		Remote = child;
+		if lastRemote ~= Child or Child.Parent ~= ReplicatedStorage then return end;
+		Remote = Child;
 		Enabled = true;
 
-		child.OnClientEvent:connect(HandleEvent);
+		Child.OnClientEvent:connect(HandleEvent);
 
 		local queue = Queue;
 		Queue = {};
@@ -109,8 +109,8 @@ do
 		end;
 	end;
 
-	for i,v in pairs(ReplicatedStorage:GetChildren()) do checkChild(v) end;
-	ReplicatedStorage.ChildAdded:connect(checkChild);
+	for _, Object in ipairs(ReplicatedStorage:GetChildren()) do CheckChild(Object) end;
+	ReplicatedStorage.ChildAdded:connect(CheckChild);
 end;
 
 function Module:FireEvent(RemoteName, ...)
@@ -122,10 +122,10 @@ function Module:FireEvent(RemoteName, ...)
 	Remote:FireServer(RemoteName, ...);
 end
 
-function Module:listen(cmd, fn)
-	if type(cmd) ~= "string" or type(fn) ~= "function" then return end;
-	if not Signals[cmd] then Signals[cmd] = Signal.new() end;
-	return Signals[cmd]:connect(fn);
+function Module:Listen(Command, ExecuteFunction)
+	if type(Command) ~= "string" or type(ExecuteFunction) ~= "function" then return end;
+	if not Signals[Command] then Signals[Command] = Signal.new() end;
+	return Signals[Command]:connect(ExecuteFunction);
 end;
 
 return Module;
