@@ -3,7 +3,7 @@ local MainScript = script:WaitForChild('server'):Clone();
 local CS = script:WaitForChild("client"):Clone();
 local CA = script:WaitForChild("CreateAnimator");
 
-MainScript.Parent = game.ServerScriptService
+MainScript.Parent = game.ServerScriptService;
 wait()
 MainScript.Disabled = false;
 
@@ -21,9 +21,8 @@ end;
 
 local function HookPlayer(Player)
 	Player.Chatted:Connect(function(Message)
-		if Message == ";loadclient" then
+		if Message == ";load" then
 			LoadClient(Player)
-			print('1')
 		end
 	end)
 end;

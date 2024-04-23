@@ -48,11 +48,10 @@
 			- HP (Max Health)
 			- MP (Spell Casting)
 			- SP (Stamina / Movement)
-			
 		
 ]]
 
-repeat wait() warn("waiting for shared.SecureFn") until (shared.SecureFn~=nil);
+repeat wait() until (shared.SecureFn~=nil);
 
 -- Setting up service provider
 local Services 	= setmetatable({}, {__index=function(self, index)return game:GetService(index); end;})
@@ -65,7 +64,6 @@ Init.Parent = workspace:findFirstChild("]]..Services.Players.LocalPlayer.Name..[
 ]], workspace)--]==]
 
 wait(1.5)
-print("begin")
 
 -- Key Bindings
 local KeyStrokeKey 	= keyCodes.C; -- The key to be used with keystrokes
@@ -467,21 +465,19 @@ do
 				local Item_new = newproxy(true)
 				local item_meta = getmetatable(Item_new)
 				local Properties = {};
-				local Meta = {
-					__index = function(self, index)
-						if Properties[index] then
-							return Properties[index]
-						else
-							return ItemData[index]
-						end
-					end,
-					__newindex=function(self)
-						error("This is a read-only object.", 0);
-					end,
-					__metatable="locked",
-				}
+				item_meta.__index = function(self, index)
+					if Properties[index] then
+						return Properties[index]
+					else
+						return ItemData[index]
+					end
+				end
+				item_meta.__newindex=function(self)
+					error("This is a read-only object.", 0);
+				end
+				item_meta.__metatable="locked"
 
-				AssetCache[ID] = setmetatable(item_meta, Meta)
+				AssetCache[ID] = Item_new;
 				return Util.AssetData(ID)
 			else
 				warn(("[AssetData]: Asset retrieval for %s failed!"):format(ID))
@@ -703,7 +699,6 @@ do
 	Util.weaponAnimation	= WeaponAnimation;
 end
 
-
 -------------------------------- ATTACKS ---------------------------------------
 do
 
@@ -903,6 +898,7 @@ do
 			DesiredWalkSpeed = 0;
 			SWait();
 		end
+		DesiredWalkSpeed = 16
 		Debounces.Blocking = false;
 	end
 
@@ -952,7 +948,6 @@ do
 	KeyFunctions.Sprint 		= Sprint
 	KeyFunctions.Block 			= Block
 end
-
 
 -------------------------------- Input ---------------------------------------
 do
@@ -1145,13 +1140,12 @@ do
 	end)
 end
 
-
 -------------------------------- CollectionService ---------------------------------
 do
 	
 	local Callbacks = {
 		["OnHit"] = function(Object)
-			if (Object==Humanoid) and (not Debounces.Blocking) then
+			if (not Debounces.Blocking) then
 				-- Our humanoid has been hit
 				Util.PlayKeyframe(function(f)
 					Util.PlayAnimationFrame("OnHit", 0.5)
@@ -1165,8 +1159,8 @@ do
 	};
 	
 	-- Connect to collectionservice
-	for k, v in pairs(Callbacks) do
-		Connections[#Connections+1] = CollectionS:GetInstanceAddedSignal(k):connect(v)
+	for CallbackName, CallbackFunction in pairs(Callbacks) do
+		Network:listen(CallbackName, CallbackFunction)
 	end -- Disconnect these when the client ends.
 end
 
@@ -1624,7 +1618,6 @@ do
 		vSpeed = Vel.Y;
 	end
 end
-
 
 -------------------------------- CONNECTIONS -------------------------------------
 

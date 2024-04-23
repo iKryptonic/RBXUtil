@@ -24,16 +24,16 @@ local EffectPlayer 		= shared.SecureFn(Owner, "jK3`u*.a2P)H7Q66bT2%u7%]e`3EQ=Qy|
 local Effects			= EffectPlayer.new();
 
 function ClientReplicator.new()
-	
+
 	local obj 		= newproxy(true)-- Create object for the ClientReplicator metatable
-	local obj_meta 	= getmetatable(obj) -- Cannot use setmetatable() on objects because they are userdata, we must getmetatable() on the newproxy() first
 	local Methods 	= {}; -- The tables methods which can be triggered by Table. or Table()
 	local Properties= {}; -- The properties of the table which are only accessible via Table.
-	
 	local Signals = {};
 	
-	local Meta = {
-		__index=function(self, index)
+	do
+		local obj_meta	= getmetatable(obj) -- Cannot use setmetatable() on objects because they are userdata, we must getmetatable() on the newproxy() first
+
+		obj_meta.__index=function(self, index)
 			if Methods[index] then
 				return Methods[index]; -- First look for a method
 			elseif Properties[index] then
@@ -41,38 +41,38 @@ function ClientReplicator.new()
 			end;
 			return nil; -- Else, exit and return nil
 		end;
-		__newindex=function(self)
+		obj_meta.__newindex=function(self)
 			error("This table is readonly.", 0); -- Prevent addition of new keys to table
 			return nil;
 		end;
-		__call=function(self, method, ...)
+		obj_meta.__call=function(self, method, ...)
 			if Methods[method] then
 				return Methods[method](...) -- Allow for Table(Method, Argument) calls for method invocation
 			end;
 			return nil;
 		end;
-		__metatable="This metatable is locked."; -- Lock the newproxy's metatable
-	}
-	
+		obj_meta.__metatable="This metatable is locked."; -- Lock the newproxy's metatable
+	end;
+
 	-- Establish initial properties of the object
 	Properties.Status = "stopped"; -- ClientReplicator's status
 	Properties.ClassName = "ClientReplicator"; -- The ClassName of the object
 	Properties.Name = "ClientReplicator"; -- The name of the object
-	
+
 	-- Setting up destroy with a few aliases
 	local function Destroy()
 		Properties.Status = "ended"; -- Set the ClientReplicator to ended to prevent any actions for executing (besides getState)
 		Properties.Player = nil; -- Clear the player property of the now defunct ClientReplicator
 		Properties.Connection:disconnect();
 		Effects:Destroy(); -- Stop effects as well.
-		
+
 		for index, signal in next, Signals do
 			signal:disconnect();
 			Signals[index] = nil;
 		end
-	return;
+		return;
 	end;
-	
+
 	-- Alias setting
 	rawset(Methods, "destroy", Destroy)
 	rawset(Methods, "Destroy", Destroy)
@@ -81,7 +81,7 @@ function ClientReplicator.new()
 	rawset(Methods, "stop", Destroy)
 	rawset(Methods, "Stop", Destroy)
 	-- End Alias Setting
-	
+
 	-- Setting up Getter Methods
 	-- Returns the object's current state
 	local function getState()
@@ -92,24 +92,24 @@ function ClientReplicator.new()
 		}
 		return States[Properties.Status];
 	end
-	
+
 	-------------------------------------------------------- BEGIN REPLICATOR CODE -----------------------------------
-	
+
 	local ReplicatedStorage = Services.ReplicatedStorage;
 	local Players 			= Services.Players;
 	local RunService 		= Services.RunService;
-	
+
 	local Remote			= Instance.new("RemoteEvent");
-	
+
 	-- API Elements to expose to remoteevent:
-		-- LoadAnimationSetFromTable
-		-- PlayAnimationByTable
-		-- Destroy
-	
+	-- LoadAnimationSetFromTable
+	-- PlayAnimationByTable
+	-- Destroy
+
 	-- An ideal replicator would be able to:
-		-- Re-Detect the RemoteEvent
-		-- Send Commands to the RemoteEvent
-	
+	-- Re-Detect the RemoteEvent
+	-- Send Commands to the RemoteEvent
+
 	local Callbacks = {
 		["Animation"] = {
 			["LoadAnimationSetFromTable"] = true;
@@ -120,18 +120,18 @@ function ClientReplicator.new()
 		["Effect"] = true;
 		["Sound"] = true;
 	}
-	
+
 	local AnimationPlayers = {};
-	
+
 	local function GetAnimator(self, userId)
 		return AnimationPlayers[userId];
 	end
-	
+
 	-- Alias setting
 	rawset(Methods, 'GetAnimator', GetAnimator)
 	rawset(Methods, 'getAnimator', GetAnimator)
 	-- End Alias setting
-	
+
 	local function HookPlayer(Player)
 		if(getState()~=1) then error("This object is not running.", 0)  return end;
 		-- Create animation player for every player that joins
@@ -140,9 +140,9 @@ function ClientReplicator.new()
 		-- Begin the animation replication to be rendered by the client.
 		Animation:Initialize() -- no more setup yielding
 		AnimationPlayers[Player.userId] = Animation;
-	return true;
+		return true;
 	end
-	
+
 	local function ReplicateAnimation(Player, Callback, ...)
 		local Operation = Callbacks['Animation'][Callback];
 		if Operation then
@@ -153,11 +153,11 @@ function ClientReplicator.new()
 			end
 		end
 	end
-	
+
 	local function Encode(self, Table)
 		return Services.HttpService:JSONEncode(Table);
 	end
-	
+
 	local function Decode(self, Table)
 		return Services.HttpService:JSONDecode(Table);
 	end
@@ -167,7 +167,7 @@ function ClientReplicator.new()
 	rawset(Methods, 'Encode', Encode)
 	rawset(Methods, 'encode', Encode)
 	-- End Alias setting
-	
+
 	local function handleEvent(Animatee, Type, ...)
 		local args = table.pack(...);
 		if (Type and (Callbacks[Type]~=nil)) then
@@ -185,14 +185,14 @@ function ClientReplicator.new()
 			elseif Type=='Sound' then
 				local Parent = args[1]
 				local SoundId = args[2]
-				
+
 				if Parent and SoundId then
-					
+
 					local Volume = args[3] and args[3] or 1
 					local Pitch = args[4] and args[4] or 1
 					local OnRemove = args[5] and args[5] or false
 					local RemoveEarly = args[6]
-					
+
 					local Sound = Instance.new("Sound")
 					Sound.SoundId = "rbxassetid://"..SoundId
 					Sound.Pitch = Pitch
@@ -202,54 +202,53 @@ function ClientReplicator.new()
 					Sound.Parent = Parent;
 					wait()
 					Sound:Play();
-					
+
 					if OnRemove then
 						Sound:Destroy'';
 					elseif RemoveEarly then
 						Services.Debris:AddItem(Sound, RemoveEarly)
 					end
-					
+
 					coroutine.wrap(function()
 						repeat wait() until (not Sound.IsPlaying)
 						Services.Debris:AddItem(Sound);
 					end)()
-					
+
 				end
 			end
 		end
 	end
-	
+
 	local function FireEvent(self, Type, Callback, ...)
 		Network:FireEvent('Replicate', Type, Callback, ...)
 		handleEvent(Owner, Type, Callback, ...)
 	end
-	
+
 	-- Alias setting
 	rawset(Methods, 'FireEvent', FireEvent)
 	rawset(Methods, 'fireEvent', FireEvent)
 	-- End Alias setting
-	
+
 	local function StartListener()
-		
+
 		rawset(Properties, 'Connection', Network:listen("Replicate", handleEvent)) -- Sets connection to RBXScriptSignal
 		Effects:Initialize();
-		
+
 		rawset(Properties, 'Status', 'running')
-		Services.Players.PlayerAdded:connect(function(Player) repeat wait() until Player.Character HookPlayer(Player) end) -- Hook new players
-		
+		Services.Players.PlayerAdded:connect(function(Player) coroutine.wrap(HookPlayer)(Player) end) -- Hook new players
+
 		for _, Player in next, Services.Players:GetPlayers() do 
-			HookPlayer(Player)
+			coroutine.wrap(HookPlayer)(Player)
 		end -- Hook pre-existing players
 	end
-	
 
-	
+
+
 	-- Alias setting
 	rawset(Methods, 'StartListener', StartListener)
 	rawset(Methods, 'startListener', StartListener)
 	-- End Alias setting
-		
-return setmetatable(obj_meta, Meta)
+	return obj
 end
 
 return ClientReplicator

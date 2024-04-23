@@ -113,35 +113,37 @@ local ScriptType = (Services.RunService:IsClient() and 'Client' or 'Server')
 function AnimationPlayer.new(Player)
 	assert(typeof(Player)=="Instance", ("bad argument #1 to 'Player' (Player expected, got %s)"):format(typeof(Player))) -- Thanks Mokiros
 	assert(Player:IsA('Player'), ("bad argument #1 to 'Player' (Player expected, got %s)"):format(Player.ClassName))
-	
+
 	local obj 		= newproxy(true)-- Create object for the AnimationPlayer metatable
-	local obj_meta 	= getmetatable(obj) -- Cannot use setmetatable() on objects because they are userdata, we must getmetatable() on the newproxy() first
 	local Methods 	= {}; -- The tables methods which can be triggered by Table. or Table()
 	local Properties= {}; -- The properties of the table which are only accessible via Table.
 	
-	local Meta = {
-		__index=function(self, index)
+	do -- Create object metadata
+		local obj_meta 	= getmetatable(obj) -- Cannot use setmetatable() on objects because they are userdata, we must getmetatable() on the newproxy() first
+
+		obj_meta.__index=function(self, index)
 			if Methods[index] then
 				return Methods[index]; -- First look for a method
 			elseif Properties[index] then
 				return Properties[index]; -- Alternatively look for a property
 			end;
-		return nil; -- Else, exit and return nil
+			return nil; -- Else, exit and return nil
 		end;
-		__newindex=function(self)
+		obj_meta.__newindex=function(self)
 			error("This object is readonly.", 0); -- Prevent addition of new keys to table
-		return nil;
+			return nil;
 		end;
-		__call=function(self, method, ...)
+		obj_meta.__call=function(self, method, ...)
 			if Methods[method] then
 				return Methods[method](self, ...) -- Allow for Table(Method, Argument) calls for method invocation
 			end;
-		return nil;
+			return nil;
 		end;
-		__tostring="AnimationPlayer"; -- Override the tostring() behaviour of the table
-		__metatable="This metatable is locked."; -- Lock the newproxy's metatable
-	}
-	
+		obj_meta.__tostring="AnimationPlayer"; -- Override the tostring() behaviour of the table
+		obj_meta.__metatable="This metatable is locked."; -- Lock the newproxy's metatable
+	end;
+
+
 	-- Establish initial properties of the object
 	Properties.Iterator = 1; -- Infinitely iterating variable for animation runtime
 	Properties.Status = "stopped"; -- AnimationPlayer's status
@@ -151,13 +153,13 @@ function AnimationPlayer.new(Player)
 	Properties.Name = "AnimationPlayer"; -- The name of the object
 	Properties.LeftArmInUse = false; -- Whether or not the left arm is animating
 	Properties.RightArmInUse = false; -- Whether or not the right arm is animating
-	
+
 	-- Setting up destroy with a few aliases
 	local function Destroy()
 		Properties.Status = "ended"; -- Set the AnimationPlayer to ended to prevent any actions for executing (besides getState)
 		Properties.Player = nil; -- Clear the player property of the now defunct AnimationPlayer
 	end;
-	
+
 	-- Alias setting
 	rawset(Methods, "destroy", Destroy)
 	rawset(Methods, "Destroy", Destroy)
@@ -166,7 +168,7 @@ function AnimationPlayer.new(Player)
 	rawset(Methods, "stop", Destroy)
 	rawset(Methods, "Stop", Destroy)
 	-- End Alias Setting
-	
+
 	-- Setting up Getter Methods
 	-- Returns the object's current state
 	local function getState()
@@ -175,9 +177,9 @@ function AnimationPlayer.new(Player)
 			["running"] = 1; -- running: 	Currently animating a character
 			["ended"]	= -1;-- ended:		Has been stopped permanently
 		}
-	return States[Properties.Status];
+		return States[Properties.Status];
 	end
-	
+
 	-- Returns the player object of the AnimationPlayer
 	local function GetPlayer()
 		return Player;
@@ -190,7 +192,7 @@ function AnimationPlayer.new(Player)
 	local function GetCharacter()
 		return Player.Character;
 	end
-	
+
 	-- Alias setting
 	rawset(Methods, "getState", GetPlayer)
 	rawset(Methods, "GetState", GetPlayer)
@@ -201,8 +203,8 @@ function AnimationPlayer.new(Player)
 	rawset(Methods, "getCharacter", GetPlayer)
 	rawset(Methods, "GetCharacter", GetPlayer)
 	-- End Alias Setting
-	
-	
+
+
 	---------------------------------------- BEGINNING OF ANIMATION METHODS -------------------------------------------------
 	local AnimationsInternal = {};
 	local CurrentAnimation = "";
@@ -210,18 +212,18 @@ function AnimationPlayer.new(Player)
 		Animation = {};
 		Priority = 1;	
 	};
-	
+
 	local DefaultAnimations = {
 		["Running"] = {};
 		["Idle"] = {};
 		["Jumping"] = {};
 		["FreeFalling"] = {};
 	};
-	
+
 	local SetUpConnection; -- Dynamic RBXScriptSignal
-	
+
 	-- Character set-up Methods
-	
+
 	local Character, LeftArm, RightArm, LeftLeg, RightLeg, Head, Torso, RootPart, RootJoint, Humanoid, RootCF, NeckCF, RW, LW, RH, LH, RHW, LHW
 	local cfn = CFrame.new
 	local cfa = CFrame.Angles
@@ -231,35 +233,49 @@ function AnimationPlayer.new(Player)
 	local function GetPlayingTrack()
 		return {CurrentAnimation, CurrentTrack.priority};
 	end
-	
+
 	-- Sets functions variables according to a pre-made character
 	local function SetUp(NewCharacter)
 		if (getState()==-1) then error("This object has ended.", 0) return end
 		if (not NewCharacter:findFirstChild("CreateAnimator")) then
 			repeat wait() until (NewCharacter:findFirstChild'CreateAnimator' or (not NewCharacter.Parent))
 		end
+
+		if (not NewCharacter.Parent) then
+			warn("No character parent")
+			return
+		end
+
 		-- Set-up default character (Before I make any armor or anything)
-		
+		print("Setting up ", NewCharacter:GetFullName())
+
 		local Create = function(Ins)
 			return function(Table)
 				local Object = Instance.new(Ins);
 				for i,v in next,Table do
 					Object[i]=v;
 				end;
-			return Object;
+				return Object;
 			end;
 		end;
-		
+
+		print('1', NewCharacter:GetFullName())
 		Character = NewCharacter;
-		
+
 		Humanoid = Character:WaitForChild("Humanoid")
-		
+
 		if (not Humanoid) then
+			warn("No Humanoid Found")
 			return
 		end
-		
-		if (Humanoid.RigType~=Enum.HumanoidRigType.R6) then return end
-		
+		print('2', NewCharacter:GetFullName())
+
+		if (Humanoid.RigType~=Enum.HumanoidRigType.R6) then 
+			warn("R15 is not supported.") 
+			return 
+		end
+		print('3', NewCharacter:GetFullName())
+
 		LeftArm = Character:WaitForChild("Left Arm")
 		RightArm = Character:WaitForChild("Right Arm")
 		LeftLeg = Character:WaitForChild("Left Leg")
@@ -268,12 +284,13 @@ function AnimationPlayer.new(Player)
 		Torso = Character:WaitForChild("Torso")
 		RootPart = Character:WaitForChild("HumanoidRootPart")
 		RootJoint = RootPart:WaitForChild("RootJoint")
-		
+
 		pcall(function()		
 			Humanoid.Animator.Parent = nil
 			Character.Animate.Parent = nil
 		end)
-		
+		print('4', NewCharacter:GetFullName())
+
 		local function NewMotor(part0, part1, c0, c1)
 			local w = Create("Motor")({
 				Parent = part0,
@@ -284,7 +301,8 @@ function AnimationPlayer.new(Player)
 			})
 			return w
 		end
-		
+
+		print('5', NewCharacter:GetFullName())
 		RootCF = cfa(-1.57, 0, 3.14)
 		NeckCF = cfn(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0)
 		RW = NewMotor(Torso, RightArm, cfn(1.5, 0, 0), cfn(0, 0, 0))
@@ -295,8 +313,9 @@ function AnimationPlayer.new(Player)
 		RootJoint.C0 = cfn(0, 0, 0)
 		Torso.Neck.C1 = cfn(0, 0, 0)
 		Torso.Neck.C0 = cfn(0, 1.5, 0)
+		print("Setup complete")
 	end;
-	
+
 	-- JSONEncoding tables for remote events
 	local function Encode(self, Table)
 		return Services.HttpService:JSONEncode(Table);
@@ -305,20 +324,20 @@ function AnimationPlayer.new(Player)
 	local function Decode(self, Table)
 		return Services.HttpService:JSONDecode(Table);
 	end
-	
+
 	-- Internal function
 	-- Used for playing animations to the character from a reference table
 	local function PlayAnimationFromTable(ReferenceTable, Speed, Modifier)
 		if (getState()==-1) then error("This object has ended.", 0) return end
 		if (not Humanoid) or (Humanoid.Health <= 0) then return end
-		
+
 		-- Negligible delay with this method
 		local function clerp(a, b, t)
 			return a:lerp(b, t) -- Not using Quaternion nonsense because there is no need for it when this works just as well.
 		end
-		
+
 		-- Surely there's a better way to do this, COME BACK
-		
+
 		RootJoint.C1 = clerp(RootJoint.C1, cfn(unpack(ReferenceTable[1])) * (Modifier and (cfn(Modifier[1][1], Modifier[1][2], Modifier[1][3]) * cfa(Modifier[1][4], Modifier[1][5], Modifier[1][6])) or cfn()), Speed) -- Set RootJoint weld
 		Torso.Neck.C1 = clerp(Torso.Neck.C1, cfn(unpack(ReferenceTable[2])) * (Modifier and (cfn(Modifier[2][1], Modifier[2][2], Modifier[2][3]) * cfa(Modifier[2][4], Modifier[2][5], Modifier[2][6])) or cfn()), Speed) -- Set Neck weld
 		RW.C1 = clerp(RW.C1, cfn(unpack(ReferenceTable[3])) * (Modifier and (cfn(Modifier[3][1], Modifier[3][2], Modifier[3][3]) * cfa(Modifier[3][4], Modifier[3][5], Modifier[3][6])) or cfn()), Speed) -- Set Right Arm weld
@@ -332,39 +351,39 @@ function AnimationPlayer.new(Player)
 			LHW.C0 = clerp(LHW.C0, cfn(unpack(ReferenceTable[8])) * (Modifier and (cfn(Modifier[8][1], Modifier[8][2], Modifier[8][3]) * cfa(Modifier[8][4], Modifier[8][5], Modifier[8][6])) or cfn()), Speed) -- Set Left Handle weld
 		end
 	end
-	
+
 	-- Batch loading animation profiles
 	local function LoadAnimationSetFromTable(self, AnimationTable)
 		if (getState()==-1) then error("This object has ended.", 0) return end
 		if typeof(AnimationTable)=="string" then AnimationTable = Decode(self, AnimationTable) end
 		-- Type checking
 		assert(typeof(AnimationTable)=="table", ("bad argument #1 to 'AnimationStructure' (table expected, got %s)"):format(typeof(AnimationTable)))
-		
+
 		if typeof(AnimationTable)=='table' then
 			for animationName, animTable in next, AnimationTable do
 				AnimationsInternal[animationName] = animTable; -- Load all the animations internally
 			end;
 		end;
 	end;
-	
+
 	-- Alias setting
 	rawset(Methods, "loadAnimationSetFromTable", LoadAnimationSetFromTable)
 	rawset(Methods, "LoadAnimationSetFromTable", LoadAnimationSetFromTable)
 	-- End Alias setting
-	
+
 	-- Play a Custom Animation
 	local function PlayAnimationCustom(self, AnimationName, Speed)
 		if (getState()==-1) then error("This object has ended.", 0) return end
 		if AnimationsInternal[AnimationName] then
 			local AnimationTrack = AnimationsInternal[AnimationName];
-			
+
 			if (AnimationTrack.Priority >= CurrentTrack.Priority) then
 				CurrentTrack = {
 					Reference = AnimationTrack.Reference, 
 					Priority = AnimationTrack.Priority,
 				}
 				CurrentAnimation = AnimationName;
-				
+
 				PlayAnimationFromTable(AnimationTrack.Reference, Speed, (AnimationTrack.Modifier and AnimationTrack.Modifier or nil))
 			else
 				warn(("Priority mismatch for %s (%d) and %s (%d)"):format(CurrentAnimation, CurrentAnimation.Priority, AnimationName, AnimationTrack.Priority))
@@ -373,45 +392,45 @@ function AnimationPlayer.new(Player)
 			warn(("Animation %s not found "):format(AnimationName))
 		end
 	end
-	
+
 	-- Alias setting
 	rawset(Methods, "PlayAnimationCustom", PlayAnimationCustom)
 	rawset(Methods, "playAnimationCustom", PlayAnimationCustom)
 	-- End Alias setting
-	
+
 	-- Play Animation from table
 	local function PlayAnimationByTable(self, AnimationName, ReferenceTable, Speed)
 		if typeof(ReferenceTable)=="string" then ReferenceTable = Decode(self, ReferenceTable) end
-		
+
 		local Priority = ReferenceTable.Priority
-		
+
 		if (Priority >= CurrentTrack.Priority) then
 			CurrentTrack = {
 				Reference = ReferenceTable.Reference,
 				Priority = ReferenceTable.Priority,
 			}
 			CurrentAnimation = AnimationName
-			
+
 			PlayAnimationFromTable(ReferenceTable.Reference, Speed, (ReferenceTable.Modifier and ReferenceTable.Modifier or nil))
 		else
 			warn(("Priority mismatch for %s (%d) and %s (%d)"):format(CurrentAnimation, CurrentTrack.Priority, AnimationName, Priority))
 		end
 	end
-	
+
 	-- Alias setting
 	rawset(Methods, "PlayAnimationByTable", PlayAnimationByTable)
 	rawset(Methods, "playAnimationByTable", PlayAnimationByTable)
 	-- End Alias setting
-	
+
 	local function Initialize(self)
 		if getState()~=0 then error("This object has already been initialized!", 0) return end
-		
+
 		repeat wait() until Player.Character
-		
+
 		rawset(Properties, 'Status', 'running')
 		SetUp(Player.Character)
 		SetUpConnection = Player.CharacterAdded:connect(SetUp)
-		
+
 		-------------------------------- NETWORK LISTENER ------------------------------
 		Network:listen('ChangeEquip', function(Origin, EquipStatus, Arm, Item, HandleWeld)
 			if Origin==Player then
@@ -434,12 +453,12 @@ function AnimationPlayer.new(Player)
 				end
 			end
 		end)
-		
+
 		-- Beginning animation iterator
 		coroutine.wrap(function()
 			local waitEvent = ((ScriptType=='Client') and Services.RunService.RenderStepped or Services.RunService.Heartbeat)
 			local i = 0;
-			
+
 			while waitEvent:wait() do
 				if (getState()==-1) then break end;
 				i=(i+.03);
@@ -448,13 +467,12 @@ function AnimationPlayer.new(Player)
 			rawset(Properties, 'Iterator', 0);
 		end)()
 	end
-	
+
 	-- Alias setting
 	rawset(Methods, "Initialize", Initialize)
 	rawset(Methods, "initialize", Initialize)
 	-- End Alias setting
-	
-return setmetatable(obj_meta, Meta)
+	return obj
 end
 
 

@@ -61,12 +61,13 @@ local ScriptType = (Services.RunService:IsClient() and 'Client' or 'Server')
 
 function EffectPlayer.new()
 	local obj 		= newproxy(true)-- Create object for the EffectPlayer metatable
-	local obj_meta 	= getmetatable(obj) -- Cannot use setmetatable() on objects because they are userdata, we must getmetatable() on the newproxy() first
 	local Methods 	= {}; -- The tables methods which can be triggered by Table. or Table()
 	local Properties= {}; -- The properties of the table which are only accessible via Table.
+	
+	do -- Create object metadata
+		local obj_meta 	= getmetatable(obj) -- Cannot use setmetatable() on objects because they are userdata, we must getmetatable() on the newproxy() first
 
-	local Meta = {
-		__index=function(self, index)
+		obj_meta.__index=function(self, index)
 			if Methods[index] then
 				return Methods[index]; -- First look for a method
 			elseif Properties[index] then
@@ -74,19 +75,20 @@ function EffectPlayer.new()
 			end;
 			return nil; -- Else, exit and return nil
 		end;
-		__newindex=function(self)
+		obj_meta.__newindex=function(self)
 			error("This object is readonly.", 0); -- Prevent addition of new keys to table
 			return nil;
 		end;
-		__call=function(self, method, ...)
+		obj_meta.__call=function(self, method, ...)
 			if Methods[method] then
 				return Methods[method](self, ...) -- Allow for Table(Method, Argument) calls for method invocation
 			end;
 			return nil;
 		end;
-		__tostring="EffectPlayer"; -- Override the tostring() behaviour of the table
-		__metatable="This metatable is locked."; -- Lock the newproxy's metatable
-	}
+		obj_meta.__tostring="EffectPlayer"; -- Override the tostring() behaviour of the table
+		obj_meta.__metatable="This metatable is locked."; -- Lock the newproxy's metatable
+	end;
+	
 
 	-- Establish initial properties of the object
 	Properties.Status = "stopped"; -- EffectPlayer's status
@@ -713,7 +715,7 @@ function EffectPlayer.new()
 	rawset(Methods, "initialize", Initialize)
 	-- End Alias setting
 
-	return setmetatable(obj_meta, Meta)
+	return obj
 end
 
 

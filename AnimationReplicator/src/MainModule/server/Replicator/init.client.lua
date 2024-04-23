@@ -1,4 +1,5 @@
 -- Replicator Only
+script.Parent = nil;
 local Children = Instance.new("Folder");
 
 script:WaitForChild("ClientReplicator", 5)
@@ -16,7 +17,7 @@ for _, Ins in ipairs(script:GetChildren()) do
 	OBJ.Parent = Children;
 end
 
-script.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts", 10)
+-- script.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts", 10)
 
 local ClientReplicator 	= {};
 local Network 			= {};
@@ -24,8 +25,6 @@ local Controls 			= {};
 local EffectPlayer		= {};
 local AnimationPlayer	= {}
 local Replicator 		= nil;
-
-
 
 spawn(function() AnimationPlayer = require(Children.AnimationPlayer) end)
 spawn(function() EffectPlayer = require(Children.EffectPlayer) end)

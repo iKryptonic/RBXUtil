@@ -3,6 +3,7 @@
 -- @Date: 10/25/20
 
 wait();
+script.Parent = nil;
 
 -- Service Provider
 local Services	= setmetatable({}, {__index=function(self, index)return game:GetService(index); end;}); -- Setting up service provider
@@ -53,18 +54,14 @@ end
 local function loadScript(Player)
 	local LS = Replicator:Clone();
 	wait();
-	LS.Parent = Player.Character;
+	LS.Parent = Player.PlayerGui;
 	LS.Disabled = false;
 end
 
 -- Essentially, this is playerAdded.
 local function indexPlayer(P)
 	repeat wait() warn("No Character Found") until (P and P.Character)
-	loadScript(Player);
-	
-	P.CharacterAdded:Connect(function()
-		loadScript(Player);
-	end)
+	loadScript(P);
 	
 	print("Loaded Localscript for ", P.Name)
 	PlayerData[P] = Player.new(P);
@@ -167,9 +164,13 @@ Network:listen('Damage', function(Origin, Victim, Damage, AttackName)
 	local Part = Victim.Head
 	ShowText((Part.CFrame * CFrame.new(0, 0, (Part.Size.Z / 2)).Position + Vector3.new(math.random(-5,5), 1.5, 0)), tostring(Damage), 1.5, BrickColor.new('Bright red').Color)
 	
-	CollectionS:AddTag(Victim.Humanoid, "OnHit")
+	local VictimPlayer = Services.Players:GetPlayerFromCharacter(Victim);
+	
 	Victim.Humanoid:TakeDamage(Damage);
-	CollectionS:RemoveTag(Victim.Humanoid, "OnHit")
+	
+	if VictimPlayer then
+		Network:Fire(VictimPlayer, 'OnHit')
+	end;
 end);
 Network:listen('UpdateData', function(Origin)
 	local Data = PlayerData[Origin].PlayerData

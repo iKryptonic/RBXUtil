@@ -30,7 +30,7 @@ local function new(Player)
 		UserId 		= Player.userId;
 		Equipped 	= {};
 		ActionBar 	= {};
-		WeaponEqp	= '2';
+		WeaponEqp	= '1';
 		Class		= "Beginner";
 	}
 	
